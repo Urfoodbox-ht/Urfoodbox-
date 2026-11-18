@@ -6,16 +6,24 @@ declare global {
   var _postgresPool: Pool | undefined;
 }
 
+const isValidPostgresUrl = (value?: string): value is string => {
+  if (!value) return false;
+  const trimmed = value.trim();
+  return trimmed.startsWith('postgres://') || trimmed.startsWith('postgresql://');
+};
+
 export const createPool = () => {
   if (!global._postgresPool) {
-    if (process.env.DATABASE_URL) {
+    const rawDatabaseUrl = process.env.DATABASE_URL;
+    if (isValidPostgresUrl(rawDatabaseUrl)) {
+      const databaseUrl = rawDatabaseUrl.trim();
       const useSsl =
         process.env.DATABASE_SSL !== 'false' &&
-        !process.env.DATABASE_URL.includes('localhost') &&
-        !process.env.DATABASE_URL.includes('127.0.0.1');
+        !databaseUrl.includes('localhost') &&
+        !databaseUrl.includes('127.0.0.1');
 
       global._postgresPool = new Pool({
-        connectionString: process.env.DATABASE_URL,
+        connectionString: databaseUrl,
         ssl: useSsl ? { rejectUnauthorized: false } : false,
         max: 5,
         idleTimeoutMillis: 20000,

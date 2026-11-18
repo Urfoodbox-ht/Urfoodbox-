@@ -3,7 +3,12 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-const databaseUrl = process.env.DATABASE_URL;
+const rawDatabaseUrl = process.env.DATABASE_URL?.trim();
+const databaseUrl =
+  rawDatabaseUrl &&
+  (rawDatabaseUrl.startsWith('postgres://') || rawDatabaseUrl.startsWith('postgresql://'))
+    ? rawDatabaseUrl
+    : undefined;
 const sqlHost = process.env.SQL_HOST;
 const sqlDbName = process.env.SQL_DB_NAME;
 const user = process.env.SQL_ADMIN_USER;
@@ -11,7 +16,7 @@ const password = process.env.SQL_ADMIN_PASSWORD;
 
 if (!databaseUrl && (!sqlHost || !sqlDbName || !user || !password)) {
   throw new Error(
-    'Either DATABASE_URL (for Vercel/external PostgreSQL) or SQL_HOST/SQL_DB_NAME/SQL_ADMIN_USER/SQL_ADMIN_PASSWORD must be set.'
+    'Either a valid PostgreSQL DATABASE_URL or SQL_HOST/SQL_DB_NAME/SQL_ADMIN_USER/SQL_ADMIN_PASSWORD must be set.'
   );
 }
 

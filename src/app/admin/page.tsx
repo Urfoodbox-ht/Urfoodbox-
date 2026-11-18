@@ -26,7 +26,9 @@ export default function AdminPage() {
   return (
     <AdminDashboard
       onExitAdmin={() => router.push('/')}
-      onStorefrontUpdated={async () => {}}
+      onStorefrontUpdated={async () => {
+        router.refresh();
+      }}
       t={TRANSLATIONS.en}
     />
   );

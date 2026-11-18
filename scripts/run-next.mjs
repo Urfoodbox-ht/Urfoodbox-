@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 
 const mode = process.argv[2] === 'start' ? 'start' : 'dev';
@@ -8,13 +9,21 @@ const port =
     ? String(Number(process.env.DEFAULT_APP_PORT) || 3000)
     : String(Number(process.env.PORT) || 3000);
 
-const nextBin = path.resolve(process.cwd(), 'node_modules', '.bin', 'next');
+const standaloneServer = path.resolve(process.cwd(), '.next', 'standalone', 'server.js');
+const useStandalone = mode === 'start' && fs.existsSync(standaloneServer);
 
-const child = spawn(nextBin, [mode, '-H', '0.0.0.0', '-p', port], {
+const cmd = useStandalone
+  ? process.execPath
+  : path.resolve(process.cwd(), 'node_modules', '.bin', 'next');
+
+const args = useStandalone ? [standaloneServer] : [mode, '-H', '0.0.0.0', '-p', port];
+
+const child = spawn(cmd, args, {
   stdio: 'inherit',
   env: {
     ...process.env,
     PORT: port,
+    HOSTNAME: '0.0.0.0',
   },
 });
 

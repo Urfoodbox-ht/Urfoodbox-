@@ -24,6 +24,7 @@ import {
   getLocalizedProductName,
   type TranslationBundle,
 } from '../i18n/translations.ts';
+import { safeFetchJson } from '../lib/fetch-json.ts';
 import type {
   BusinessSettings,
   CartItem,
@@ -169,8 +170,9 @@ export const Storefront: React.FC<StorefrontProps> = ({
     setTrackError(null);
     setTrackedOrder(null);
     try {
-      const res = await fetch(`/api/orders/track/${encodeURIComponent(trackInput.trim())}`);
-      const data = await res.json();
+      const { res, data } = await safeFetchJson<any>(
+        `/api/orders/track/${encodeURIComponent(trackInput.trim())}`
+      );
       if (!res.ok) {
         throw new Error(data.error || t.tracker.notFound);
       }
@@ -191,16 +193,18 @@ export const Storefront: React.FC<StorefrontProps> = ({
     }
     setCommentSubmitting(true);
     try {
-      const res = await fetch('/api/comments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          authorName: commentAuthor.trim(),
-          rating: commentRating,
-          commentText: commentText.trim(),
-        }),
-      });
-      const data = await res.json();
+      const { res, data } = await safeFetchJson<{ comment: CustomerComment; error?: string }>(
+        '/api/comments',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            authorName: commentAuthor.trim(),
+            rating: commentRating,
+            commentText: commentText.trim(),
+          }),
+        }
+      );
       if (!res.ok) {
         throw new Error(data.error || 'Could not submit comment.');
       }

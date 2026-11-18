@@ -9,6 +9,7 @@ import { ProductModal } from './ProductModal.tsx';
 import { Storefront } from './Storefront.tsx';
 import { TRANSLATIONS } from '../i18n/translations.ts';
 import { auth, googleAuthProvider } from '../lib/firebase.ts';
+import { safeFetchJson } from '../lib/fetch-json.ts';
 import type {
   BusinessSettings,
   CartItem,
@@ -22,6 +23,12 @@ import type {
   ThemeMode,
 } from '../types.ts';
 
+interface StorefrontShellProps {
+  initialSettings?: BusinessSettings | null;
+  initialProducts?: Product[];
+  initialComments?: CustomerComment[];
+}
+
 function readStored<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
   if (typeof window === 'undefined') return fallback;
   try {
@@ -33,18 +40,23 @@ function readStored<T extends string>(key: string, allowed: readonly T[], fallba
   return fallback;
 }
 
-export function StorefrontShell() {
+export function StorefrontShell({
+  initialSettings = null,
+  initialProducts = [],
+  initialComments = [],
+}: StorefrontShellProps) {
   const router = useRouter();
+  const hasInitialData = initialProducts.length > 0 || initialSettings !== null;
 
   const [lang, setLang] = useState<Language>('en');
   const [currency, setCurrency] = useState<Currency>('USD');
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [prefsLoaded, setPrefsLoaded] = useState(false);
 
-  const [settings, setSettings] = useState<BusinessSettings | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [comments, setComments] = useState<CustomerComment[]>([]);
-  const [loadingStore, setLoadingStore] = useState(true);
+  const [settings, setSettings] = useState<BusinessSettings | null>(initialSettings);
+  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [comments, setComments] = useState<CustomerComment[]>(initialComments);
+  const [loadingStore, setLoadingStore] = useState(!hasInitialData);
   const [storeError, setStoreError] = useState<string | null>(null);
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -119,26 +131,34 @@ export function StorefrontShell() {
     }
   }, [cart, prefsLoaded]);
 
-  const fetchStorefront = useCallback(async () => {
-    setLoadingStore(true);
+  const fetchStorefront = useCallback(async (background = false) => {
+    if (!background) {
+      setLoadingStore(true);
+    }
     setStoreError(null);
     try {
-      const res = await fetch('/api/storefront');
-      const data = await res.json();
+      const { res, data } = await safeFetchJson<{
+        settings: BusinessSettings;
+        products: Product[];
+        comments: CustomerComment[];
+        error?: string;
+      }>('/api/storefront');
       if (!res.ok) throw new Error(data.error || 'Failed to load storefront');
       setSettings(data.settings);
       setProducts(data.products || []);
       setComments(data.comments || []);
     } catch (err: any) {
-      setStoreError(err.message || 'Could not load storefront catalog.');
+      if (!background) {
+        setStoreError(err.message || 'Could not load storefront catalog.');
+      }
     } finally {
       setLoadingStore(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchStorefront();
-  }, [fetchStorefront]);
+    fetchStorefront(hasInitialData);
+  }, [fetchStorefront, hasInitialData]);
 
   const getAuthToken = useCallback(async (): Promise<string | null> => {
     if (!auth.currentUser) return null;
@@ -158,11 +178,14 @@ export function StorefrontShell() {
     }
     try {
       const token = await user.getIdToken();
-      const res = await fetch('/api/customer/me', {
+      const { res, data } = await safeFetchJson<{
+        profile?: CustomerProfile;
+        orders?: OrderRecord[];
+        subscriptions?: SubscriptionRecord[];
+      }>('/api/customer/me', {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
         setCustomerProfile(data.profile || null);
         setCustomerOrders(data.orders || []);
         setCustomerSubscriptions(data.subscriptions || []);
@@ -230,7 +253,7 @@ export function StorefrontShell() {
         onCommentAdded={(comment) => setComments((prev) => [comment, ...prev])}
         loading={loadingStore}
         error={storeError}
-        onRetry={fetchStorefront}
+        onRetry={() => fetchStorefront(false)}
         lang={lang}
         onLangChange={setLang}
         currency={currency}

@@ -22,6 +22,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { auth, googleAuthProvider } from '../lib/firebase.ts';
+import { safeFetchJson } from '../lib/fetch-json.ts';
 import { formatMoney, type TranslationBundle } from '../i18n/translations.ts';
 import type {
   BusinessSettings,
@@ -64,6 +65,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -87,6 +89,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Product Editor Modal / Inline state
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [isNewProduct, setIsNewProduct] = useState(false);
+  const [pendingProductImage, setPendingProductImage] = useState<File | null>(null);
   const [savingProduct, setSavingProduct] = useState(false);
   const [uploadingImageFor, setUploadingImageFor] = useState<number | null>(null);
 
@@ -99,6 +102,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
   const showToast = (type: 'ok' | 'err', text: string) => {
@@ -106,18 +112,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setTimeout(() => setToast(null), 4000);
   };
 
+  const openNewBoxModal = () => {
+    setActiveTab('products');
+    setIsNewProduct(true);
+    setPendingProductImage(null);
+    setEditingProduct({
+      nameEn: '',
+      nameFr: '',
+      nameHt: '',
+      descriptionEn: '',
+      descriptionFr: '',
+      descriptionHt: '',
+      priceUsd: '0.00',
+      priceHtg: '0.00',
+      isAvailable: true,
+      isFeatured: true,
+      sortOrder: products.length + 1,
+    });
+  };
+
   const loadOverview = async () => {
     setLoadingData(true);
     try {
-      const res = await fetch('/api/admin/overview', { credentials: 'include' });
+      const { res, data } = await safeFetchJson('/api/admin/overview', {
+        credentials: 'include',
+      });
       if (!res.ok) {
         if (res.status === 401) {
           setAdminUser(null);
           return;
         }
-        throw new Error('Failed to load dashboard data');
+        throw new Error(data.error || 'Failed to load dashboard data');
       }
-      const data = await res.json();
       setOrders(data.orders || []);
       setProducts(data.products || []);
       setComments(data.comments || []);
@@ -136,12 +162,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/admin/session', { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
+        const { res, data } = await safeFetchJson('/api/admin/session', {
+          credentials: 'include',
+        });
+        if (res.ok && data.admin) {
           setAdminUser(data.admin);
           await loadOverview();
         }
+      } catch {
+        // Not signed in yet
       } finally {
         setCheckingSession(false);
       }
@@ -153,7 +182,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setLoginError(null);
     setLoginLoading(true);
     try {
-      const res = await fetch('/api/admin/login', {
+      const { res, data } = await safeFetchJson('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -162,7 +191,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           password: loginPassword,
         }),
       });
-      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Login failed');
       setAdminUser(data.admin);
       setLoginPassword('');
@@ -180,12 +208,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const cred = await signInWithPopup(auth, googleAuthProvider);
       const idToken = await cred.user.getIdToken();
-      const res = await fetch('/api/admin/login-google', {
+      const { res, data } = await safeFetchJson('/api/admin/login-google', {
         method: 'POST',
         headers: { Authorization: `Bearer ${idToken}` },
         credentials: 'include',
       });
-      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Unauthorized Google account');
       setAdminUser(data.admin);
       await loadOverview();
@@ -204,13 +231,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleOrderStatusChange = async (orderId: number, status: OrderStatus) => {
     try {
-      const res = await fetch(`/api/admin/orders/${orderId}/status`, {
+      const { res, data } = await safeFetchJson(`/api/admin/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ status }),
       });
-      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update status');
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
       showToast('ok', `Order status updated to ${status}`);
@@ -221,13 +247,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSaveExchangeRate = async () => {
     try {
-      const res = await fetch('/api/admin/settings', {
+      const { res, data } = await safeFetchJson('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ exchangeRateHtgPerUsd: exchangeRateInput }),
       });
-      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update exchange rate');
       setSettings(data.settings);
       setSettingsForm(data.settings);
@@ -240,13 +265,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleToggleProductAvailability = async (product: Product) => {
     try {
-      const res = await fetch(`/api/admin/products/${product.id}`, {
+      const { res, data } = await safeFetchJson(`/api/admin/products/${product.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ isAvailable: !product.isAvailable }),
       });
-      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update product');
       setProducts((prev) => prev.map((p) => (p.id === product.id ? data.product : p)));
       await onStorefrontUpdated();
@@ -266,18 +290,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         : `/api/admin/products/${editingProduct.id}`;
       const method = isNewProduct ? 'POST' : 'PUT';
 
-      const res = await fetch(url, {
+      const { res, data } = await safeFetchJson(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(editingProduct),
       });
-      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save product');
+
+      if (pendingProductImage && data.product?.id) {
+        const formData = new FormData();
+        formData.append('image', pendingProductImage);
+        const { res: imgRes, data: imgData } = await safeFetchJson(
+          `/api/admin/products/${data.product.id}/image`,
+          {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          }
+        );
+        if (!imgRes.ok) {
+          showToast('err', imgData.error || 'Box saved, but photo upload failed.');
+        }
+      }
 
       await loadOverview();
       await onStorefrontUpdated();
       setEditingProduct(null);
+      setPendingProductImage(null);
       showToast('ok', isNewProduct ? 'New food box added.' : 'Food box updated.');
     } catch (err: any) {
       showToast('err', err.message);
@@ -288,12 +328,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleDeleteProduct = async (product: Product) => {
     try {
-      const res = await fetch(`/api/admin/products/${product.id}`, {
+      const { res, data } = await safeFetchJson(`/api/admin/products/${product.id}`, {
         method: 'DELETE',
         credentials: 'include',
       });
       if (!res.ok) {
-        const data = await res.json();
         throw new Error(data.error || 'Failed to delete product');
       }
       setProducts((prev) => prev.filter((p) => p.id !== product.id));
@@ -306,13 +345,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleToggleCommentVisibility = async (comment: CustomerComment) => {
     try {
-      const res = await fetch(`/api/admin/comments/${comment.id}`, {
+      const { res, data } = await safeFetchJson(`/api/admin/comments/${comment.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ isVisible: !comment.isVisible }),
       });
-      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update comment');
       setComments((prev) => prev.map((c) => (c.id === comment.id ? data.comment : c)));
       await onStorefrontUpdated();
@@ -324,12 +362,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleDeleteComment = async (commentId: number) => {
     try {
-      const res = await fetch(`/api/admin/comments/${commentId}`, {
+      const { res, data } = await safeFetchJson(`/api/admin/comments/${commentId}`, {
         method: 'DELETE',
         credentials: 'include',
       });
       if (!res.ok) {
-        const data = await res.json();
         throw new Error(data.error || 'Failed to delete comment');
       }
       setComments((prev) => prev.filter((c) => c.id !== commentId));
@@ -345,12 +382,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const formData = new FormData();
       formData.append('image', file);
-      const res = await fetch(`/api/admin/products/${productId}/image`, {
+      const { res, data } = await safeFetchJson(`/api/admin/products/${productId}/image`, {
         method: 'POST',
         credentials: 'include',
         body: formData,
       });
-      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed');
       setProducts((prev) =>
         prev.map((p) => (p.id === productId ? { ...p, imageUrl: `${data.imageUrl}?v=${Date.now()}` } : p))
@@ -384,12 +420,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const formData = new FormData();
       formData.append('image', file);
-      const res = await fetch('/api/admin/logo', {
+      const { res, data } = await safeFetchJson('/api/admin/logo', {
         method: 'POST',
         credentials: 'include',
         body: formData,
       });
-      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Logo upload failed');
       await loadOverview();
       await onStorefrontUpdated();
@@ -420,13 +455,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.preventDefault();
     setSavingSettings(true);
     try {
-      const res = await fetch('/api/admin/settings', {
+      const { res, data } = await safeFetchJson('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(settingsForm),
       });
-      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save settings');
       setSettings(data.settings);
       setSettingsForm(data.settings);
@@ -447,13 +481,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
     setSavingPassword(true);
     try {
-      const res = await fetch('/api/admin/change-password', {
+      const { res, data } = await safeFetchJson('/api/admin/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ currentPassword, newPassword }),
       });
-      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update password');
       setCurrentPassword('');
       setNewPassword('');
@@ -520,14 +553,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <label className="block text-xs font-medium text-[var(--ufb-muted)] mb-1.5">
                 Password
               </label>
-              <input
-                type="password"
-                required
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                placeholder="••••••••••••"
-                className="w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] px-3.5 py-2.5 text-sm focus:border-[#F47B20] focus:outline-none"
-              />
+              <div className="relative">
+                <input
+                  type={showLoginPassword ? 'text' : 'password'}
+                  required
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] pl-3.5 pr-10 py-2.5 text-sm focus:border-[#F47B20] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword((prev) => !prev)}
+                  aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--ufb-muted)] hover:text-[var(--ufb-text)] transition-colors"
+                >
+                  {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             {loginError && (
@@ -591,6 +634,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="flex items-center gap-2.5 shrink-0">
             <button
               type="button"
+              onClick={openNewBoxModal}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#F47B20] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#df6912] transition-colors whitespace-nowrap"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Box</span>
+            </button>
+            <button
+              type="button"
               onClick={loadOverview}
               disabled={loadingData}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--ufb-border)] px-3 py-2 text-xs font-semibold hover:bg-[var(--ufb-surface)] transition-colors whitespace-nowrap"
@@ -614,7 +665,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {(
             [
               ['orders', `Orders (${orders.length})`, ShoppingBag],
-              ['products', `Products & Rates (${products.length})`, Package],
+              ['products', `Food Boxes & Rates (${products.length})`, Package],
               ['comments', `Comments (${comments.length})`, MessageSquare],
               ['settings', 'Storefront & Contacts', Settings],
               ['security', 'Security', KeyRound],
@@ -827,22 +878,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setIsNewProduct(true);
-                  setEditingProduct({
-                    nameEn: '',
-                    nameFr: '',
-                    nameHt: '',
-                    descriptionEn: '',
-                    descriptionFr: '',
-                    descriptionHt: '',
-                    priceUsd: '0.00',
-                    priceHtg: '0.00',
-                    isAvailable: true,
-                    isFeatured: true,
-                    sortOrder: products.length + 1,
-                  });
-                }}
+                onClick={openNewBoxModal}
                 className="inline-flex items-center gap-2 rounded-lg bg-[#F47B20] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#df6912] transition-colors whitespace-nowrap"
               >
                 <Plus className="h-4 w-4" />
@@ -948,6 +984,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         type="button"
                         onClick={() => {
                           setIsNewProduct(false);
+                          setPendingProductImage(null);
                           setEditingProduct({ ...product });
                         }}
                         className="rounded-lg bg-[var(--ufb-surface)] border border-[var(--ufb-border)] px-3 py-1.5 text-xs font-semibold hover:border-[#F47B20] transition-colors"
@@ -1314,39 +1351,69 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <label className="block text-xs font-medium text-[var(--ufb-muted)] mb-1">
                   Current Password
                 </label>
-                <input
-                  type="password"
-                  required
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] px-3.5 py-2.5 text-sm"
-                />
+                <div className="relative">
+                  <input
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    required
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] pl-3.5 pr-10 py-2.5 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword((prev) => !prev)}
+                    aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--ufb-muted)] hover:text-[var(--ufb-text)] transition-colors"
+                  >
+                    {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--ufb-muted)] mb-1">
                   New Password (min 8 characters)
                 </label>
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] px-3.5 py-2.5 text-sm"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    required
+                    minLength={8}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] pl-3.5 pr-10 py-2.5 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((prev) => !prev)}
+                    aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--ufb-muted)] hover:text-[var(--ufb-text)] transition-colors"
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--ufb-muted)] mb-1">
                   Confirm New Password
                 </label>
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] px-3.5 py-2.5 text-sm"
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    minLength={8}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] pl-3.5 pr-10 py-2.5 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--ufb-muted)] hover:text-[var(--ufb-text)] transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <button
                 type="submit"
@@ -1516,6 +1583,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-xl border border-[var(--ufb-border)] bg-[var(--ufb-surface)] p-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold">Box Photograph (Optional)</div>
+                <div className="text-[11px] text-[var(--ufb-muted)]">
+                  {pendingProductImage
+                    ? `Selected: ${pendingProductImage.name}`
+                    : 'JPG, PNG, WEBP, or GIF up to 4.5 MB'}
+                </div>
+              </div>
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] px-3.5 py-2 text-xs font-semibold hover:border-[#F47B20] transition-colors">
+                <Upload className="h-3.5 w-3.5" />
+                <span>{pendingProductImage ? 'Change Photo' : 'Choose Photo'}</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setPendingProductImage(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-4">

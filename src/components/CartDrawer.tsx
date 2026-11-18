@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import { formatMoney, getLocalizedProductName, type TranslationBundle } from '../i18n/translations.ts';
+import { safeFetchJson } from '../lib/fetch-json.ts';
 import type {
   CartItem,
   Currency,
@@ -152,7 +153,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const res = await fetch('/api/orders', {
+      const { res, data } = await safeFetchJson<any>('/api/orders', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -171,7 +172,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         }),
       });
 
-      const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Order submission failed');
       }
