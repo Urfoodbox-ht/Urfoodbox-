@@ -1,0 +1,8 @@
+{
+  "name": "UrFoodBox",
+  "description": "Machew devan pot kay ou. Online grocery box ordering platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

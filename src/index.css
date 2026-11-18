@@ -1,0 +1,67 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --ufb-bg: #ffffff;
+    --ufb-surface: #f8f9fa;
+    --ufb-card: #ffffff;
+    --ufb-border: rgba(23, 23, 23, 0.1);
+    --ufb-text: #171717;
+    --ufb-muted: #525252;
+    --ufb-orange: #f47b20;
+    --ufb-orange-hover: #df6912;
+    --ufb-green: #238447;
+    --ufb-green-hover: #1b6b38;
+    --ufb-watermark-opacity: 0.045;
+  }
+
+  .theme-brand {
+    --ufb-bg: #faf5ee;
+    --ufb-surface: #f4eadc;
+    --ufb-card: #ffffff;
+    --ufb-border: rgba(244, 123, 32, 0.2);
+    --ufb-text: #171717;
+    --ufb-muted: #574c42;
+    --ufb-watermark-opacity: 0.06;
+  }
+
+  .dark {
+    --ufb-bg: #171717;
+    --ufb-surface: #212121;
+    --ufb-card: #1f1f1f;
+    --ufb-border: rgba(255, 255, 255, 0.12);
+    --ufb-text: #f5f5f5;
+    --ufb-muted: #a3a3a3;
+    --ufb-watermark-opacity: 0.05;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+    background-color: var(--ufb-bg);
+    color: var(--ufb-text);
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  .font-mono-num {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
