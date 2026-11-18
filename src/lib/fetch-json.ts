@@ -2,7 +2,10 @@ export async function safeFetchJson<T = Record<string, any>>(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<{ res: Response; data: T }> {
-  const res = await fetch(input, init);
+  const res = await fetch(input, {
+    cache: 'no-store',
+    ...init,
+  });
   const text = await res.text();
   if (!text || !text.trim()) {
     if (!res.ok) {

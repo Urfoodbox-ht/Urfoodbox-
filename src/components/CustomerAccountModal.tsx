@@ -7,6 +7,7 @@ import {
   getLocalizedProductName,
   type TranslationBundle,
 } from '../i18n/translations.ts';
+import { safeFetchJson } from '../lib/fetch-json.ts';
 import type {
   CustomerProfile,
   Language,
@@ -85,7 +86,7 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
     try {
       const token = await getAuthToken();
       if (!token) return;
-      const res = await fetch('/api/customer/me', {
+      const { res, data } = await safeFetchJson('/api/customer/me', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -97,7 +98,7 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
           defaultDeliveryAddress,
         }),
       });
-      if (!res.ok) throw new Error('Failed to save profile');
+      if (!res.ok) throw new Error(data.error || 'Failed to save profile');
       await onRefreshAccount();
       setFeedback(t.account.savedSuccess);
     } catch (err: any) {
@@ -124,7 +125,7 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
           isDefault: (profile.savedAddresses || []).length === 0,
         },
       ];
-      const res = await fetch('/api/customer/me', {
+      const { res, data } = await safeFetchJson('/api/customer/me', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -135,7 +136,7 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
           defaultDeliveryAddress: defaultDeliveryAddress || newAddrText.trim(),
         }),
       });
-      if (!res.ok) throw new Error('Could not save address');
+      if (!res.ok) throw new Error(data.error || 'Could not save address');
       setNewAddrLabel('');
       setNewAddrText('');
       await onRefreshAccount();
@@ -149,7 +150,7 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
     const token = await getAuthToken();
     if (!token) return;
     const updatedAddresses = (profile.savedAddresses || []).filter((a) => a.id !== addrId);
-    await fetch('/api/customer/me', {
+    await safeFetchJson('/api/customer/me', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -167,7 +168,7 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
     try {
       const token = await getAuthToken();
       if (!token) return;
-      const res = await fetch('/api/customer/subscriptions', {
+      const { res, data } = await safeFetchJson('/api/customer/subscriptions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -181,7 +182,7 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
           notes: subNotes,
         }),
       });
-      if (!res.ok) throw new Error('Could not save preference');
+      if (!res.ok) throw new Error(data.error || 'Could not save preference');
       setSubNotes('');
       await onRefreshAccount();
       setFeedback(t.account.subSaved);
