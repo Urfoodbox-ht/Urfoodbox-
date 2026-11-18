@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { Minus, Package, Plus, ShoppingCart, X } from 'lucide-react';
 import {

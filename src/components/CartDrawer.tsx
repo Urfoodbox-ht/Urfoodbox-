@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import { formatMoney, getLocalizedProductName, type TranslationBundle } from '../i18n/translations.ts';

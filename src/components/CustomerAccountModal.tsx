@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { CalendarClock, LogOut, MapPin, PackageCheck, User, X } from 'lucide-react';
 import {

@@ -1,15 +1,14 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
-import { CartDrawer } from './components/CartDrawer.tsx';
-import { CustomerAccountModal } from './components/CustomerAccountModal.tsx';
-import { ProductModal } from './components/ProductModal.tsx';
-import { Storefront } from './components/Storefront.tsx';
+'use client';
 
-const AdminDashboard = lazy(() =>
-  import('./components/AdminDashboard.tsx').then((m) => ({ default: m.AdminDashboard }))
-);
-import { TRANSLATIONS } from './i18n/translations.ts';
-import { auth, googleAuthProvider } from './lib/firebase.ts';
+import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
+import { CartDrawer } from './CartDrawer.tsx';
+import { CustomerAccountModal } from './CustomerAccountModal.tsx';
+import { ProductModal } from './ProductModal.tsx';
+import { Storefront } from './Storefront.tsx';
+import { TRANSLATIONS } from '../i18n/translations.ts';
+import { auth, googleAuthProvider } from '../lib/firebase.ts';
 import type {
   BusinessSettings,
   CartItem,
@@ -21,9 +20,10 @@ import type {
   Product,
   SubscriptionRecord,
   ThemeMode,
-} from './types.ts';
+} from '../types.ts';
 
 function readStored<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
+  if (typeof window === 'undefined') return fallback;
   try {
     const val = localStorage.getItem(key) as T | null;
     if (val && allowed.includes(val)) return val;
@@ -33,18 +33,13 @@ function readStored<T extends string>(key: string, allowed: readonly T[], fallba
   return fallback;
 }
 
-export default function App() {
-  const [route, setRoute] = useState<'storefront' | 'admin'>(() =>
-    window.location.pathname.startsWith('/admin') ? 'admin' : 'storefront'
-  );
+export function StorefrontShell() {
+  const router = useRouter();
 
-  const [lang, setLang] = useState<Language>(() => readStored('ufb_lang', ['en', 'fr', 'ht'], 'en'));
-  const [currency, setCurrency] = useState<Currency>(() =>
-    readStored('ufb_currency', ['USD', 'HTG'], 'USD')
-  );
-  const [theme, setTheme] = useState<ThemeMode>(() =>
-    readStored('ufb_theme', ['light', 'dark', 'brand'], 'light')
-  );
+  const [lang, setLang] = useState<Language>('en');
+  const [currency, setCurrency] = useState<Currency>('USD');
+  const [theme, setTheme] = useState<ThemeMode>('light');
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   const [settings, setSettings] = useState<BusinessSettings | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -52,14 +47,7 @@ export default function App() {
   const [loadingStore, setLoadingStore] = useState(true);
   const [storeError, setStoreError] = useState<string | null>(null);
 
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    try {
-      const raw = localStorage.getItem('ufb_cart');
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
@@ -73,26 +61,23 @@ export default function App() {
 
   const t = TRANSLATIONS[lang];
 
-  // Sync URL navigation for /admin vs /
+  // Hydrate persisted client preferences safely after mount
   useEffect(() => {
-    const handlePop = () => {
-      setRoute(window.location.pathname.startsWith('/admin') ? 'admin' : 'storefront');
-    };
-    window.addEventListener('popstate', handlePop);
-    return () => window.removeEventListener('popstate', handlePop);
-  }, []);
-
-  const navigateTo = (target: 'storefront' | 'admin') => {
-    const path = target === 'admin' ? '/admin' : '/';
-    if (window.location.pathname !== path) {
-      window.history.pushState({}, '', path);
+    setLang(readStored<Language>('ufb_lang', ['en', 'fr', 'ht'] as const, 'en'));
+    setCurrency(readStored<Currency>('ufb_currency', ['USD', 'HTG'] as const, 'USD'));
+    setTheme(readStored<ThemeMode>('ufb_theme', ['light', 'dark', 'brand'] as const, 'light'));
+    try {
+      const rawCart = localStorage.getItem('ufb_cart');
+      if (rawCart) setCart(JSON.parse(rawCart));
+    } catch {
+      // ignore
     }
-    setRoute(target);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+    setPrefsLoaded(true);
+  }, []);
 
   // Sync Theme Classes on <html>
   useEffect(() => {
+    if (!prefsLoaded) return;
     const root = document.documentElement;
     root.classList.remove('dark', 'theme-brand');
     if (theme === 'dark') {
@@ -105,31 +90,34 @@ export default function App() {
     } catch {
       // ignore
     }
-  }, [theme]);
+  }, [theme, prefsLoaded]);
 
   useEffect(() => {
+    if (!prefsLoaded) return;
     try {
       localStorage.setItem('ufb_lang', lang);
     } catch {
       // ignore
     }
-  }, [lang]);
+  }, [lang, prefsLoaded]);
 
   useEffect(() => {
+    if (!prefsLoaded) return;
     try {
       localStorage.setItem('ufb_currency', currency);
     } catch {
       // ignore
     }
-  }, [currency]);
+  }, [currency, prefsLoaded]);
 
   useEffect(() => {
+    if (!prefsLoaded) return;
     try {
       localStorage.setItem('ufb_cart', JSON.stringify(cart));
     } catch {
       // ignore
     }
-  }, [cart]);
+  }, [cart, prefsLoaded]);
 
   const fetchStorefront = useCallback(async () => {
     setLoadingStore(true);
@@ -233,24 +221,6 @@ export default function App() {
     setCart((prev) => prev.filter((i) => i.productId !== productId));
   };
 
-  if (route === 'admin') {
-    return (
-      <Suspense
-        fallback={
-          <div className="min-h-screen flex items-center justify-center bg-[var(--ufb-bg)] text-[var(--ufb-muted)] text-sm">
-            Loading Owner Admin...
-          </div>
-        }
-      >
-        <AdminDashboard
-          onExitAdmin={() => navigateTo('storefront')}
-          onStorefrontUpdated={fetchStorefront}
-          t={t}
-        />
-      </Suspense>
-    );
-  }
-
   return (
     <>
       <Storefront
@@ -274,7 +244,7 @@ export default function App() {
         onSelectProduct={(p) => setSelectedProduct(p)}
         onOpenAccount={() => setAccountOpen(true)}
         customerEmail={firebaseUser?.email || null}
-        onOpenAdmin={() => navigateTo('admin')}
+        onOpenAdmin={() => router.push('/admin')}
       />
 
       <ProductModal
