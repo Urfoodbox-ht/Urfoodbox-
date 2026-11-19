@@ -61,6 +61,13 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     console.error('Admin Google login error:', error);
+    if (
+      error instanceof Error &&
+      (error.message.includes('Database is not configured') ||
+        error.message.includes('Database connection failed'))
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json(
       { error: 'Google administrator sign-in failed.' },
       { status: 401 }

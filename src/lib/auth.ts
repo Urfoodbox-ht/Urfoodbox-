@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import { eq } from 'drizzle-orm';
 import { adminAuth } from './firebase-admin.ts';
-import { db } from '../db/index.ts';
+import { db, hasConfiguredDatabase } from '../db/index.ts';
 import { administratorAccounts } from '../db/schema.ts';
 
 export const ADMIN_COOKIE_NAME = 'ufb_admin_session';
@@ -131,12 +131,43 @@ export async function getAuthenticatedFirebaseUser(
 export async function getAuthenticatedAdmin(
   request: Request
 ): Promise<AuthenticatedAdmin | null> {
-  const cookies = parseCookies(request.headers.get('cookie'));
-  const cookieToken = cookies[ADMIN_COOKIE_NAME];
+  if (!hasConfiguredDatabase()) {
+    return null;
+  }
 
-  if (cookieToken) {
-    const session = verifyAdminSessionToken(cookieToken);
-    if (session) {
+  try {
+    const cookies = parseCookies(request.headers.get('cookie'));
+    const cookieToken = cookies[ADMIN_COOKIE_NAME];
+
+    if (cookieToken) {
+      const session = verifyAdminSessionToken(cookieToken);
+      if (session) {
+        const [admin] = await db
+          .select({
+            id: administratorAccounts.id,
+            email: administratorAccounts.email,
+            fullName: administratorAccounts.fullName,
+            role: administratorAccounts.role,
+            isActive: administratorAccounts.isActive,
+          })
+          .from(administratorAccounts)
+          .where(eq(administratorAccounts.id, session.adminId))
+          .limit(1);
+
+        if (admin && admin.isActive) {
+          return {
+            id: admin.id,
+            email: admin.email,
+            fullName: admin.fullName,
+            role: admin.role,
+          };
+        }
+      }
+    }
+
+    // Also support Firebase Bearer token for verified owner Google Sign-In
+    const decoded = await getAuthenticatedFirebaseUser(request);
+    if (decoded?.email && decoded.email_verified) {
       const [admin] = await db
         .select({
           id: administratorAccounts.id,
@@ -146,7 +177,7 @@ export async function getAuthenticatedAdmin(
           isActive: administratorAccounts.isActive,
         })
         .from(administratorAccounts)
-        .where(eq(administratorAccounts.id, session.adminId))
+        .where(eq(administratorAccounts.email, decoded.email.toLowerCase()))
         .limit(1);
 
       if (admin && admin.isActive) {
@@ -158,31 +189,8 @@ export async function getAuthenticatedAdmin(
         };
       }
     }
-  }
-
-  // Also support Firebase Bearer token for verified owner Google Sign-In
-  const decoded = await getAuthenticatedFirebaseUser(request);
-  if (decoded?.email && decoded.email_verified) {
-    const [admin] = await db
-      .select({
-        id: administratorAccounts.id,
-        email: administratorAccounts.email,
-        fullName: administratorAccounts.fullName,
-        role: administratorAccounts.role,
-        isActive: administratorAccounts.isActive,
-      })
-      .from(administratorAccounts)
-      .where(eq(administratorAccounts.email, decoded.email.toLowerCase()))
-      .limit(1);
-
-    if (admin && admin.isActive) {
-      return {
-        id: admin.id,
-        email: admin.email,
-        fullName: admin.fullName,
-        role: admin.role,
-      };
-    }
+  } catch (err) {
+    console.error('Admin session verification error:', err);
   }
 
   return null;

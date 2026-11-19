@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { asc, desc, eq, inArray } from 'drizzle-orm';
-import { db } from './index.ts';
+import { db, hasConfiguredDatabase, pool } from './index.ts';
 import {
   administratorAccounts,
   businessSettings,
@@ -17,10 +17,209 @@ import {
 
 let seedPromise: Promise<void> | null = null;
 
+async function ensureSchemaExists(): Promise<void> {
+  const check = await pool.query(`
+    SELECT
+      to_regclass('public.products') IS NOT NULL AS has_products,
+      to_regclass('public.product_images') IS NOT NULL AS has_product_images,
+      to_regclass('public.administrator_accounts') IS NOT NULL AS has_admins,
+      to_regclass('public.customer_accounts') IS NOT NULL AS has_customers,
+      to_regclass('public.orders') IS NOT NULL AS has_orders,
+      to_regclass('public.order_items') IS NOT NULL AS has_order_items,
+      to_regclass('public.business_settings') IS NOT NULL AS has_settings,
+      to_regclass('public.subscription_records') IS NOT NULL AS has_subscriptions,
+      to_regclass('public.customer_comments') IS NOT NULL AS has_comments,
+      EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'box_period'
+      ) AS has_box_period,
+      EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'household_size'
+      ) AS has_household_size
+  `);
+
+  const row = check.rows[0];
+  const allTablesExist =
+    row &&
+    row.has_products &&
+    row.has_product_images &&
+    row.has_admins &&
+    row.has_customers &&
+    row.has_orders &&
+    row.has_order_items &&
+    row.has_settings &&
+    row.has_subscriptions &&
+    row.has_comments;
+
+  if (allTablesExist && row.has_box_period && row.has_household_size) {
+    return;
+  }
+
+  if (!allTablesExist) {
+    await pool.query(`
+    CREATE TABLE IF NOT EXISTS products (
+      id SERIAL PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      name_en TEXT NOT NULL,
+      name_fr TEXT NOT NULL DEFAULT '',
+      name_ht TEXT NOT NULL DEFAULT '',
+      description_en TEXT NOT NULL DEFAULT '',
+      description_fr TEXT NOT NULL DEFAULT '',
+      description_ht TEXT NOT NULL DEFAULT '',
+      price_usd NUMERIC(10, 2) NOT NULL DEFAULT '0.00',
+      price_htg NUMERIC(12, 2) NOT NULL DEFAULT '0.00',
+      is_available BOOLEAN NOT NULL DEFAULT true,
+      is_featured BOOLEAN NOT NULL DEFAULT true,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      primary_image_id INTEGER,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS product_images (
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+      purpose TEXT NOT NULL DEFAULT 'product',
+      file_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      data_base64 TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      is_primary BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS administrator_accounts (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      full_name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      firebase_uid TEXT UNIQUE,
+      role TEXT NOT NULL DEFAULT 'owner',
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      last_login_at TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS customer_accounts (
+      id SERIAL PRIMARY KEY,
+      uid TEXT NOT NULL UNIQUE,
+      email TEXT NOT NULL UNIQUE,
+      full_name TEXT NOT NULL DEFAULT '',
+      phone TEXT NOT NULL DEFAULT '',
+      saved_addresses JSONB NOT NULL DEFAULT '[]'::jsonb,
+      default_delivery_address TEXT NOT NULL DEFAULT '',
+      preferred_language TEXT NOT NULL DEFAULT 'en',
+      preferred_currency TEXT NOT NULL DEFAULT 'USD',
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS orders (
+      id SERIAL PRIMARY KEY,
+      order_reference TEXT NOT NULL UNIQUE,
+      customer_account_id INTEGER REFERENCES customer_accounts(id) ON DELETE SET NULL,
+      customer_name TEXT NOT NULL,
+      customer_phone TEXT NOT NULL,
+      delivery_address TEXT NOT NULL,
+      order_instructions TEXT NOT NULL DEFAULT '',
+      box_period TEXT NOT NULL DEFAULT '',
+      household_size INTEGER NOT NULL DEFAULT 1,
+      currency TEXT NOT NULL DEFAULT 'USD',
+      payment_method TEXT NOT NULL DEFAULT 'cash_on_delivery',
+      subtotal_amount NUMERIC(12, 2) NOT NULL,
+      total_amount NUMERIC(12, 2) NOT NULL,
+      exchange_rate_htg_per_usd NUMERIC(10, 2) NOT NULL DEFAULT '132.00',
+      status TEXT NOT NULL DEFAULT 'New',
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS order_items (
+      id SERIAL PRIMARY KEY,
+      order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+      product_name TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      unit_price_usd NUMERIC(10, 2) NOT NULL,
+      unit_price_htg NUMERIC(12, 2) NOT NULL,
+      line_total NUMERIC(12, 2) NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS business_settings (
+      id SERIAL PRIMARY KEY,
+      singleton_key TEXT NOT NULL UNIQUE DEFAULT 'default',
+      business_name TEXT NOT NULL DEFAULT 'UrFoodBox',
+      slogan TEXT NOT NULL DEFAULT 'Machew devan pot kay ou.',
+      whatsapp_number TEXT NOT NULL DEFAULT '',
+      tiktok_url TEXT NOT NULL DEFAULT '',
+      facebook_url TEXT NOT NULL DEFAULT '',
+      contact_email TEXT NOT NULL DEFAULT '',
+      contact_address TEXT NOT NULL DEFAULT '',
+      promo_title_en TEXT NOT NULL DEFAULT 'Your Grocery Market, Right at Your Door',
+      promo_title_fr TEXT NOT NULL DEFAULT 'Votre marché, directement devant votre porte',
+      promo_title_ht TEXT NOT NULL DEFAULT 'Machew devan pot kay ou.',
+      promo_subtitle_en TEXT NOT NULL DEFAULT 'Order quality food boxes effortlessly in USD or HTG and let UrFoodBox handle careful preparation and doorstep delivery.',
+      promo_subtitle_fr TEXT NOT NULL DEFAULT 'Commandez vos paniers alimentaires en USD ou HTG et laissez UrFoodBox préparer et livrer votre commande chez vous.',
+      promo_subtitle_ht TEXT NOT NULL DEFAULT 'Kòmande bwat pwovizyon ou yo an USD oswa HTG epi kite UrFoodBox prepare ak pote yo tou dwat devan pòt kay ou.',
+      promo_banner_en TEXT NOT NULL DEFAULT 'Machew devan pot kay ou.',
+      promo_banner_fr TEXT NOT NULL DEFAULT 'Machew devan pot kay ou.',
+      promo_banner_ht TEXT NOT NULL DEFAULT 'Machew devan pot kay ou.',
+      exchange_rate_htg_per_usd NUMERIC(10, 2) NOT NULL DEFAULT '132.00',
+      logo_image_id INTEGER,
+      subscriptions_enabled BOOLEAN NOT NULL DEFAULT false,
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS subscription_records (
+      id SERIAL PRIMARY KEY,
+      customer_account_id INTEGER NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+      product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+      frequency TEXT NOT NULL DEFAULT 'monthly',
+      preferred_delivery_day TEXT NOT NULL DEFAULT 'Saturday',
+      delivery_address TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'waitlist',
+      payment_provider_configured BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS customer_comments (
+      id SERIAL PRIMARY KEY,
+      author_name TEXT NOT NULL,
+      rating INTEGER NOT NULL DEFAULT 5,
+      comment_text TEXT NOT NULL,
+      is_visible BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+  }
+
+  if (!row?.has_box_period) {
+    await pool.query(
+      `ALTER TABLE orders ADD COLUMN IF NOT EXISTS box_period TEXT NOT NULL DEFAULT '';`
+    );
+  }
+  if (!row?.has_household_size) {
+    await pool.query(
+      `ALTER TABLE orders ADD COLUMN IF NOT EXISTS household_size INTEGER NOT NULL DEFAULT 1;`
+    );
+  }
+}
+
 export async function ensureSeeded(): Promise<void> {
+  if (!hasConfiguredDatabase()) {
+    throw new Error(
+      'Database is not configured. Add a PostgreSQL connection string (postgresql://...) as DATABASE_URL or POSTGRES_URL in your Vercel Environment Variables and redeploy.'
+    );
+  }
+
   if (!seedPromise) {
     seedPromise = (async () => {
       try {
+        await ensureSchemaExists();
+
         // 1. Seed default business_settings singleton
         await db
           .insert(businessSettings)
@@ -118,6 +317,15 @@ export async function ensureSeeded(): Promise<void> {
       } catch (error) {
         seedPromise = null;
         console.error('Database seed failed:', error);
+        if (error instanceof Error) {
+          if (error.message.includes('Database is not configured')) {
+            throw error;
+          }
+          throw new Error(
+            `Database connection failed: ${error.message}. Verify your PostgreSQL DATABASE_URL / POSTGRES_URL environment variable.`,
+            { cause: error }
+          );
+        }
         throw new Error('Failed to initialize database records.', { cause: error });
       }
     })();
@@ -156,6 +364,13 @@ export async function getStorefrontData() {
     };
   } catch (error) {
     console.error('Database query failed in getStorefrontData:', error);
+    if (
+      error instanceof Error &&
+      (error.message.includes('Database is not configured') ||
+        error.message.includes('Database connection failed'))
+    ) {
+      throw error;
+    }
     throw new Error('Unable to load storefront catalog.', { cause: error });
   }
 }

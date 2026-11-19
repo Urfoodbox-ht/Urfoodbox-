@@ -1,6 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+if (process.env.VERCEL) {
+  process.exit(0);
+}
+
 const root = process.cwd();
 const nextDir = path.join(root, '.next');
 const standaloneDir = path.join(nextDir, 'standalone');

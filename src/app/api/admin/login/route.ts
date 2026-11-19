@@ -68,6 +68,12 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     console.error('Admin login error:', error);
-    return NextResponse.json({ error: 'Failed to sign in.' }, { status: 500 });
+    const message =
+      error instanceof Error &&
+      (error.message.includes('Database is not configured') ||
+        error.message.includes('Database connection failed'))
+        ? error.message
+        : 'Failed to sign in.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
