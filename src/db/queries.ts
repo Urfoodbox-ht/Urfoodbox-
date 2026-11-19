@@ -334,45 +334,61 @@ export async function ensureSeeded(): Promise<void> {
 }
 
 export async function getStorefrontData() {
-  try {
-    await ensureSeeded();
-    const [settings] = await db
-      .select()
-      .from(businessSettings)
-      .where(eq(businessSettings.singletonKey, 'default'))
-      .limit(1);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await ensureSeeded();
+      const [settings] = await db
+        .select()
+        .from(businessSettings)
+        .where(eq(businessSettings.singletonKey, 'default'))
+        .limit(1);
 
-    const allProducts = await db
-      .select()
-      .from(products)
-      .orderBy(asc(products.sortOrder), asc(products.id));
+      const allProducts = await db
+        .select()
+        .from(products)
+        .orderBy(asc(products.sortOrder), asc(products.id));
 
-    const visibleComments = await db
-      .select()
-      .from(customerComments)
-      .where(eq(customerComments.isVisible, true))
-      .orderBy(desc(customerComments.createdAt))
-      .limit(50);
+      const visibleComments = await db
+        .select()
+        .from(customerComments)
+        .where(eq(customerComments.isVisible, true))
+        .orderBy(desc(customerComments.createdAt))
+        .limit(50);
 
-    return {
-      settings,
-      products: allProducts.map((p) => ({
-        ...p,
-        imageUrl: p.primaryImageId ? `/api/images/${p.primaryImageId}` : null,
-      })),
-      comments: visibleComments,
-    };
-  } catch (error) {
-    console.error('Database query failed in getStorefrontData:', error);
-    if (
-      error instanceof Error &&
-      (error.message.includes('Database is not configured') ||
-        error.message.includes('Database connection failed'))
-    ) {
-      throw error;
+      return {
+        settings,
+        products: allProducts.map((p) => ({
+          ...p,
+          imageUrl: p.primaryImageId ? `/api/images/${p.primaryImageId}` : null,
+        })),
+        comments: visibleComments,
+      };
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes('Database is not configured')
+      ) {
+        console.error('Database query failed in getStorefrontData:', error);
+        throw error;
+      }
+
+      if (attempt === 0) {
+        seedPromise = null;
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        continue;
+      }
+
+      console.error('Database query failed in getStorefrontData:', error);
+      if (
+        error instanceof Error &&
+        error.message.includes('Database connection failed')
+      ) {
+        throw error;
+      }
+      throw new Error('Unable to load storefront catalog.', { cause: error });
     }
-    throw new Error('Unable to load storefront catalog.', { cause: error });
   }
+  throw new Error('Unable to load storefront catalog.');
 }
 
 export async function getAllCommentsForAdmin() {
