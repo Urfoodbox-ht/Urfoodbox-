@@ -1,7 +1,16 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { getRedirectResult, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
+import {
+  EmailAuthProvider,
+  getRedirectResult,
+  reauthenticateWithCredential,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+  updatePassword,
+} from 'firebase/auth';
 import {
   ArrowLeft,
   Check,
@@ -99,9 +108,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
 
-  // Login form state
+  // Login & initial-owner bootstrap state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [bootstrapToken, setBootstrapToken] = useState('');
+  const [bootstrapStatus, setBootstrapStatus] = useState<{
+    bootstrapOpen: boolean;
+    bootstrapConfigured: boolean;
+    requiresBootstrapToken: boolean;
+  } | null>(null);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -205,6 +220,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     (async () => {
       try {
+        let resolvedBootstrapOpen = false;
+        let resolvedRequiresToken = false;
+
+        try {
+          const { res: bRes, data: bData } = await safeFetchJson('/api/admin/bootstrap');
+          if (bRes.ok && typeof bData?.bootstrapOpen === 'boolean') {
+            resolvedBootstrapOpen = bData.bootstrapOpen;
+            resolvedRequiresToken = Boolean(bData.requiresBootstrapToken);
+            setBootstrapStatus({
+              bootstrapOpen: bData.bootstrapOpen,
+              bootstrapConfigured: Boolean(bData.bootstrapConfigured),
+              requiresBootstrapToken: Boolean(bData.requiresBootstrapToken),
+            });
+          }
+        } catch {
+          // Non-fatal bootstrap status check failure
+        }
+
         const redirectFlag =
           typeof window !== 'undefined' && sessionStorage.getItem(ADMIN_REDIRECT_FLAG_KEY) === '1';
         if (redirectFlag) {
@@ -212,13 +245,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           const redirectCred = await getRedirectResult(auth);
           if (redirectCred?.user) {
             const idToken = await redirectCred.user.getIdToken();
-            const { res: gRes, data: gData } = await safeFetchJson('/api/admin/login', {
+            const useBootstrap = resolvedBootstrapOpen && !resolvedRequiresToken;
+            const endpoint = useBootstrap ? '/api/admin/bootstrap' : '/api/admin/login';
+            const { res: gRes, data: gData } = await safeFetchJson(endpoint, {
               method: 'POST',
-              headers: { Authorization: `Bearer ${idToken}` },
+              headers: {
+                Authorization: `Bearer ${idToken}`,
+                'Content-Type': 'application/json',
+              },
               credentials: 'include',
+              body: useBootstrap ? JSON.stringify({}) : undefined,
             });
             if (gRes.ok && gData.admin) {
               if (gData.sessionToken) writeStoredAdminToken(gData.sessionToken);
+              if (useBootstrap) {
+                setBootstrapStatus((prev) => (prev ? { ...prev, bootstrapOpen: false } : null));
+              }
               setAdminUser(gData.admin);
               await loadOverview();
               return;
@@ -229,6 +271,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }
         }
 
+        await auth.authStateReady();
         const sessionInit = buildAdminFetchInit();
         if (auth.currentUser) {
           try {
@@ -261,22 +304,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setLoginError(null);
     setLoginLoading(true);
     try {
-      const { res, data } = await safeFetchJson('/api/admin/login', {
+      const cred = await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
+      const idToken = await cred.user.getIdToken();
+      const isBootstrap = Boolean(bootstrapStatus?.bootstrapOpen);
+      const endpoint = isBootstrap ? '/api/admin/bootstrap' : '/api/admin/login';
+      const { res, data } = await safeFetchJson(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+        },
         credentials: 'include',
-        body: JSON.stringify({
-          email: loginEmail.trim(),
-          password: loginPassword,
-        }),
+        body: isBootstrap ? JSON.stringify({ bootstrapToken: bootstrapToken.trim() }) : undefined,
       });
-      if (!res.ok) throw new Error(data.error || 'Login failed');
+      if (!res.ok) throw new Error(data.error || 'Administrator authorization failed');
       if (data.sessionToken) writeStoredAdminToken(data.sessionToken);
+      if (isBootstrap) {
+        setBootstrapStatus((prev) => (prev ? { ...prev, bootstrapOpen: false } : null));
+        setBootstrapToken('');
+      }
       setAdminUser(data.admin);
       setLoginPassword('');
       await loadOverview();
     } catch (err: any) {
-      setLoginError(err.message || 'Invalid email or password');
+      const code = err?.code || '';
+      if (code === 'auth/operation-not-allowed') {
+        setLoginError(
+          'Email/password sign-in is not enabled in Firebase Authentication. Enable Email/Password in Firebase Console → Authentication → Sign-in method, or use Google Sign-In.'
+        );
+      } else if (
+        code === 'auth/invalid-credential' ||
+        code === 'auth/user-not-found' ||
+        code === 'auth/wrong-password'
+      ) {
+        setLoginError(
+          'Firebase rejected this email or password. Verify the user exists in Firebase Authentication → Users with this password.'
+        );
+      } else if (code === 'auth/too-many-requests') {
+        setLoginError('Too many failed sign-in attempts. Please wait a few minutes and try again.');
+      } else {
+        setLoginError(err.message || 'Invalid administrator credentials.');
+      }
     } finally {
       setLoginLoading(false);
     }
@@ -288,13 +356,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const cred = await signInWithPopup(auth, googleAuthProvider);
       const idToken = await cred.user.getIdToken();
-      const { res, data } = await safeFetchJson('/api/admin/login', {
+      const isBootstrap = Boolean(bootstrapStatus?.bootstrapOpen);
+      const endpoint = isBootstrap ? '/api/admin/bootstrap' : '/api/admin/login';
+      const { res, data } = await safeFetchJson(endpoint, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${idToken}` },
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+        },
         credentials: 'include',
+        body: isBootstrap ? JSON.stringify({ bootstrapToken: bootstrapToken.trim() }) : undefined,
       });
       if (!res.ok) throw new Error(data.error || 'Unauthorized Google account');
       if (data.sessionToken) writeStoredAdminToken(data.sessionToken);
+      if (isBootstrap) {
+        setBootstrapStatus((prev) => (prev ? { ...prev, bootstrapOpen: false } : null));
+        setBootstrapToken('');
+      }
       setAdminUser(data.admin);
       await loadOverview();
     } catch (err: any) {
@@ -314,7 +392,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         await signInWithRedirect(auth, googleAuthProvider);
         return;
       }
-      if (code !== 'auth/popup-closed-by-user') {
+      if (code === 'auth/unauthorized-domain') {
+        const host = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
+        setLoginError(
+          `Domain "${host}" is not listed in Firebase Authentication → Settings → Authorized domains. Add "${host}" to your Firebase project's Authorized domains (or use your own Firebase project via NEXT_PUBLIC_FIREBASE_* env vars).`
+        );
+      } else if (code !== 'auth/popup-closed-by-user') {
         setLoginError(err.message || 'Google sign-in failed');
       }
     } finally {
@@ -613,21 +696,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
     setSavingPassword(true);
     try {
-      const { res, data } = await safeFetchJson(
-        '/api/admin/change-password',
-        buildAdminFetchInit({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ currentPassword, newPassword }),
-        })
+      await auth.authStateReady();
+      const currentUser = auth.currentUser;
+      if (!currentUser || !currentUser.email) {
+        throw new Error(
+          'Sign in again with Firebase Email/Password before updating your Firebase password.'
+        );
+      }
+      const hasPasswordProvider = currentUser.providerData.some(
+        (provider) => provider.providerId === 'password'
       );
-      if (!res.ok) throw new Error(data.error || 'Failed to update password');
+      if (!hasPasswordProvider) {
+        throw new Error(
+          'This administrator account signs in with Google. Manage your password through your Google account settings.'
+        );
+      }
+      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+      await updatePassword(currentUser, newPassword);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      showToast('ok', 'Administrator password updated successfully.');
+      showToast('ok', 'Firebase administrator password updated successfully.');
     } catch (err: any) {
-      showToast('err', err.message);
+      const code = err?.code || '';
+      if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        showToast('err', 'Current password is incorrect.');
+      } else if (code === 'auth/weak-password') {
+        showToast('err', 'New password is too weak. Use at least 8 characters.');
+      } else {
+        showToast('err', err.message || 'Failed to update password.');
+      }
     } finally {
       setSavingPassword(false);
     }
@@ -662,11 +761,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <h1 className="font-display text-2xl font-bold tracking-tight">UrFoodBox Owner Admin</h1>
+            <h1 className="font-display text-2xl font-bold tracking-tight">
+              {bootstrapStatus?.bootstrapOpen ? 'Authorize Initial Owner' : 'UrFoodBox Owner Admin'}
+            </h1>
             <p className="text-sm text-[var(--ufb-muted)]">
-              Authorized administrator access only. Sign in to manage food boxes, pricing, exchange rates, and incoming orders.
+              {bootstrapStatus?.bootstrapOpen
+                ? 'No owner administrator is bound yet. Sign in with your Firebase Authentication account to authorize the initial owner.'
+                : 'Authorized administrator access only. Sign in with your authorized Firebase account to manage food boxes, pricing, and orders.'}
             </p>
           </div>
+
+          {bootstrapStatus?.bootstrapOpen && !bootstrapStatus.bootstrapConfigured && (
+            <div className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+              <div className="font-semibold">Server Authorization Required Before Setup</div>
+              <p>
+                Configure <code className="font-mono">ADMIN_EMAIL</code> and/or{' '}
+                <code className="font-mono">ADMIN_BOOTSTRAP_TOKEN</code> in your Vercel Environment
+                Variables and redeploy before claiming the initial owner account.
+              </p>
+            </div>
+          )}
 
           <form onSubmit={handlePasswordLogin} className="space-y-4">
             <div>
@@ -678,7 +792,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 required
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="owner@urfoodbox.com"
+                placeholder="admin@example.com"
                 className="w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] px-3.5 py-2.5 text-sm focus:border-[#F47B20] focus:outline-none"
               />
             </div>
@@ -707,6 +821,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
+            {bootstrapStatus?.bootstrapOpen && bootstrapStatus.requiresBootstrapToken && (
+              <div>
+                <label className="block text-xs font-medium text-[var(--ufb-muted)] mb-1.5">
+                  Bootstrap Authorization Token
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={bootstrapToken}
+                  onChange={(e) => setBootstrapToken(e.target.value)}
+                  placeholder="Value of ADMIN_BOOTSTRAP_TOKEN"
+                  className="w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] px-3.5 py-2.5 text-sm focus:border-[#F47B20] focus:outline-none"
+                />
+              </div>
+            )}
+
             {loginError && (
               <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs font-medium text-red-600 dark:text-red-400">
                 {loginError}
@@ -715,10 +845,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <button
               type="submit"
-              disabled={loginLoading}
+              disabled={loginLoading || (Boolean(bootstrapStatus?.bootstrapOpen) && !bootstrapStatus?.bootstrapConfigured)}
               className="w-full rounded-lg bg-[#F47B20] px-5 py-3 text-sm font-semibold text-white hover:bg-[#df6912] disabled:opacity-60 transition-colors"
             >
-              {loginLoading ? 'Signing in...' : 'Sign In to Dashboard'}
+              {loginLoading
+                ? 'Verifying with Firebase...'
+                : bootstrapStatus?.bootstrapOpen
+                  ? 'Verify & Authorize Initial Owner'
+                  : 'Sign In to Dashboard'}
             </button>
           </form>
 
@@ -731,7 +865,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <button
             type="button"
-            disabled={loginLoading}
+            disabled={loginLoading || (Boolean(bootstrapStatus?.bootstrapOpen) && !bootstrapStatus?.bootstrapConfigured)}
             onClick={handleGoogleAdminLogin}
             className="w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] px-5 py-2.5 text-sm font-semibold hover:border-[#238447] hover:text-[#238447] disabled:opacity-60 transition-colors"
           >
@@ -1477,7 +1611,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div>
               <h3 className="font-display text-lg font-bold">Administrator Password</h3>
               <p className="text-xs text-[var(--ufb-muted)] mt-1">
-                Update the private password used for owner dashboard login. Public admin registration is permanently disabled.
+                Update your Firebase Authentication Email/Password credential. Public administrator registration is permanently disabled.
               </p>
             </div>
             <form onSubmit={handleChangePassword} className="space-y-4">

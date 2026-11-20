@@ -88,12 +88,26 @@ export function getAdminApp(): App {
   }
 
   const projectId = resolveFirebaseProjectId();
+  const expectedClientProjectId =
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() || firebaseConfig.projectId;
   const serviceAccount = parseServiceAccountFromEnv();
 
+  if (projectId !== expectedClientProjectId) {
+    console.warn(
+      `Firebase Admin projectId (${projectId}) differs from client projectId (${expectedClientProjectId}). Client tokens will fail verification if these projects do not match.`
+    );
+  }
+
   if (serviceAccount) {
+    const resolvedProjectId = serviceAccount.projectId || projectId;
+    if (resolvedProjectId !== expectedClientProjectId) {
+      console.warn(
+        `Firebase service account projectId (${resolvedProjectId}) differs from client projectId (${expectedClientProjectId}).`
+      );
+    }
     return initializeApp({
       credential: cert(serviceAccount),
-      projectId: serviceAccount.projectId || projectId,
+      projectId: resolvedProjectId,
     });
   }
 

@@ -400,20 +400,20 @@ __turbopack_context__.s([
     ()=>getOrCreateCustomerAccount,
     "getStorefrontData",
     ()=>getStorefrontData,
+    "hasClaimedFirebaseOwner",
+    ()=>hasClaimedFirebaseOwner,
     "updateCustomerProfile",
     ()=>updateCustomerProfile
 ]);
 var __TURBOPACK__imported__module__$5b$externals$5d2f$node$3a$crypto__$5b$external$5d$__$28$node$3a$crypto$2c$__cjs$29$__ = __turbopack_context__.i("[externals]/node:crypto [external] (node:crypto, cjs)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$bcryptjs$2f$index$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/bcryptjs/index.js [app-route] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$select$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/drizzle-orm/sql/expressions/select.js [app-route] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/drizzle-orm/sql/expressions/conditions.js [app-route] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$select$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/drizzle-orm/sql/expressions/select.js [app-route] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/db/index.ts [app-route] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/db/schema.ts [app-route] (ecmascript)");
 var __turbopack_async_dependencies__ = __turbopack_handle_async_dependencies__([
     __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__
 ]);
 [__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__] = __turbopack_async_dependencies__.then ? (await __turbopack_async_dependencies__)() : __turbopack_async_dependencies__;
-;
 ;
 ;
 ;
@@ -677,24 +677,7 @@ async function ensureSeeded() {
                         target: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["products"].slug
                     });
                 }
-                // 3. Seed owner administrator account if no admin exists
-                const existingAdmins = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select({
-                    id: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].id
-                }).from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).limit(1);
-                if (existingAdmins.length === 0) {
-                    const adminEmail = (process.env.ADMIN_EMAIL || 'rosemyriam01@gmail.com').trim().toLowerCase();
-                    const initialPassword = process.env.ADMIN_INITIAL_PASSWORD || 'UrFoodBox#2026';
-                    const passwordHash = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$bcryptjs$2f$index$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].hash(initialPassword, 10);
-                    await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].insert(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).values({
-                        email: adminEmail,
-                        fullName: 'UrFoodBox Owner',
-                        passwordHash,
-                        role: 'owner',
-                        isActive: true
-                    }).onConflictDoNothing({
-                        target: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].email
-                    });
-                }
+            // Administrator accounts are provisioned strictly via Firebase Authentication + server-authorized first-owner bootstrap (never hardcoded).
             } catch (error) {
                 seedPromise = null;
                 console.error('Database seed failed:', error);
@@ -713,6 +696,13 @@ async function ensureSeeded() {
         })();
     }
     return seedPromise;
+}
+async function hasClaimedFirebaseOwner() {
+    await ensureSeeded();
+    const existing = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select({
+        id: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].id
+    }).from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["and"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["isNotNull"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].firebaseUid), (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].isActive, true))).limit(1);
+    return existing.length > 0;
 }
 async function getStorefrontData() {
     for(let attempt = 0; attempt < 2; attempt++){
@@ -1283,6 +1273,8 @@ __turbopack_context__.s([
     ()=>AdminAuthError,
     "authenticateAdminWithFirebaseToken",
     ()=>authenticateAdminWithFirebaseToken,
+    "bootstrapInitialOwnerWithFirebaseToken",
+    ()=>bootstrapInitialOwnerWithFirebaseToken,
     "buildAdminCookieConfig",
     ()=>buildAdminCookieConfig,
     "createAdminSessionToken",
@@ -1293,10 +1285,14 @@ __turbopack_context__.s([
     ()=>getAuthenticatedAdmin,
     "getAuthenticatedFirebaseUser",
     ()=>getAuthenticatedFirebaseUser,
+    "getBootstrapConfigStatus",
+    ()=>getBootstrapConfigStatus,
     "isCrossSiteRequest",
     ()=>isCrossSiteRequest,
     "isHttpsRequest",
     ()=>isHttpsRequest,
+    "isOwnerBootstrapOpen",
+    ()=>isOwnerBootstrapOpen,
     "parseCookies",
     ()=>parseCookies,
     "verifyAdminSessionToken",
@@ -1304,6 +1300,7 @@ __turbopack_context__.s([
 ]);
 var __TURBOPACK__imported__module__$5b$externals$5d2f$node$3a$crypto__$5b$external$5d$__$28$node$3a$crypto$2c$__cjs$29$__ = __turbopack_context__.i("[externals]/node:crypto [external] (node:crypto, cjs)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/drizzle-orm/sql/expressions/conditions.js [app-route] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$sql$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/drizzle-orm/sql/sql.js [app-route] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2d$admin$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/firebase-admin.ts [app-route] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/db/index.ts [app-route] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$queries$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/db/queries.ts [app-route] (ecmascript)");
@@ -1428,6 +1425,42 @@ function extractBearerToken(request) {
     const token = authHeader.slice('Bearer '.length).trim();
     return token || null;
 }
+function assertValidAdminDecodedToken(decoded) {
+    const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
+    if (!decoded.uid || !email) {
+        throw new AdminAuthError('Firebase account must have a valid email address.', 401);
+    }
+    // Google Sign-In always asserts verified email; manually added Firebase Email/Password users
+    // default to email_verified=false until verified, so allow 'password' provider when authorized server-side.
+    const provider = decoded.firebase?.sign_in_provider;
+    if (provider !== 'password' && !decoded.email_verified) {
+        throw new AdminAuthError('Verified email required for administrator sign-in.', 401);
+    }
+    return {
+        uid: decoded.uid,
+        email
+    };
+}
+function timingSafeMatch(provided, expected) {
+    const a = __TURBOPACK__imported__module__$5b$externals$5d2f$node$3a$crypto__$5b$external$5d$__$28$node$3a$crypto$2c$__cjs$29$__["default"].createHash('sha256').update(provided, 'utf8').digest();
+    const b = __TURBOPACK__imported__module__$5b$externals$5d2f$node$3a$crypto__$5b$external$5d$__$28$node$3a$crypto$2c$__cjs$29$__["default"].createHash('sha256').update(expected, 'utf8').digest();
+    return __TURBOPACK__imported__module__$5b$externals$5d2f$node$3a$crypto__$5b$external$5d$__$28$node$3a$crypto$2c$__cjs$29$__["default"].timingSafeEqual(a, b);
+}
+function getBootstrapConfigStatus() {
+    const bootstrapToken = process.env.ADMIN_BOOTSTRAP_TOKEN?.trim() || '';
+    const adminEmail = process.env.ADMIN_EMAIL?.trim() || '';
+    return {
+        bootstrapConfigured: Boolean(bootstrapToken || adminEmail),
+        requiresBootstrapToken: Boolean(bootstrapToken),
+        hasAdminEmailAllowlist: Boolean(adminEmail)
+    };
+}
+async function isOwnerBootstrapOpen() {
+    if (!(0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["hasConfiguredDatabase"])()) {
+        return false;
+    }
+    return !await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$queries$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["hasClaimedFirebaseOwner"])();
+}
 async function getAuthenticatedFirebaseUser(request) {
     const token = extractBearerToken(request);
     if (!token) {
@@ -1439,6 +1472,79 @@ async function getAuthenticatedFirebaseUser(request) {
         return null;
     }
 }
+async function bootstrapInitialOwnerWithFirebaseToken(idToken, providedBootstrapToken) {
+    await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$queries$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["ensureSeeded"])();
+    let decoded;
+    try {
+        decoded = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2d$admin$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["verifyFirebaseIdToken"])(idToken);
+    } catch (err) {
+        console.error('Firebase Admin ID token verification failed during bootstrap:', err);
+        throw new AdminAuthError('Invalid or expired Firebase authentication token.', 401);
+    }
+    const { uid, email } = assertValidAdminDecodedToken(decoded);
+    const expectedBootstrapToken = process.env.ADMIN_BOOTSTRAP_TOKEN?.trim() || '';
+    const expectedAdminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase() || '';
+    if (!expectedBootstrapToken && !expectedAdminEmail) {
+        throw new AdminAuthError('Initial owner bootstrap is locked. Configure ADMIN_BOOTSTRAP_TOKEN or ADMIN_EMAIL in your server environment variables.', 403);
+    }
+    if (expectedBootstrapToken) {
+        const candidate = (providedBootstrapToken || '').trim();
+        if (!candidate || !timingSafeMatch(candidate, expectedBootstrapToken)) {
+            throw new AdminAuthError('Invalid bootstrap authorization token. Verify ADMIN_BOOTSTRAP_TOKEN in your server environment.', 403);
+        }
+    }
+    if (expectedAdminEmail && email !== expectedAdminEmail) {
+        throw new AdminAuthError('This Firebase email does not match the authorized owner email (ADMIN_EMAIL).', 403);
+    }
+    const owner = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].transaction(async (tx)=>{
+        // Serialize bootstrap attempts across concurrent serverless invocations
+        await tx.execute(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$sql$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["sql"]`SELECT pg_advisory_xact_lock(71992026)`);
+        const claimed = await tx.select({
+            id: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].id
+        }).from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["and"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["isNotNull"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].firebaseUid), (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].isActive, true))).limit(1);
+        if (claimed.length > 0) {
+            throw new AdminAuthError('Initial owner administrator is already configured. Public administrator registration is disabled.', 403);
+        }
+        // Deactivate any legacy unlinked placeholder rows so only the verified Firebase owner has access
+        await tx.update(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).set({
+            isActive: false
+        }).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["isNull"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].firebaseUid));
+        const [existingForEmail] = await tx.select().from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].email, email)).limit(1);
+        const displayName = typeof decoded.name === 'string' && decoded.name.trim() ? decoded.name.trim() : 'UrFoodBox Owner';
+        if (existingForEmail) {
+            const [updated] = await tx.update(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).set({
+                firebaseUid: uid,
+                fullName: existingForEmail.fullName || displayName,
+                passwordHash: 'firebase-auth-managed',
+                role: 'owner',
+                isActive: true,
+                lastLoginAt: new Date()
+            }).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].id, existingForEmail.id)).returning({
+                id: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].id,
+                email: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].email,
+                fullName: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].fullName,
+                role: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].role
+            });
+            return updated;
+        }
+        const [inserted] = await tx.insert(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).values({
+            email,
+            fullName: displayName,
+            passwordHash: 'firebase-auth-managed',
+            firebaseUid: uid,
+            role: 'owner',
+            isActive: true,
+            lastLoginAt: new Date()
+        }).returning({
+            id: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].id,
+            email: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].email,
+            fullName: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].fullName,
+            role: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].role
+        });
+        return inserted;
+    });
+    return owner;
+}
 async function authenticateAdminWithFirebaseToken(idToken) {
     await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$queries$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["ensureSeeded"])();
     let decoded;
@@ -1448,21 +1554,23 @@ async function authenticateAdminWithFirebaseToken(idToken) {
         console.error('Firebase Admin ID token verification failed:', err);
         throw new AdminAuthError('Invalid or expired Firebase authentication token.', 401);
     }
-    if (!decoded.email || !decoded.email_verified) {
-        throw new AdminAuthError('Verified email required for administrator sign-in.', 401);
-    }
+    const { uid, email } = assertValidAdminDecodedToken(decoded);
     const [admin] = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select({
         id: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].id,
         email: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].email,
         fullName: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].fullName,
         role: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].role,
+        firebaseUid: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].firebaseUid,
         isActive: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].isActive
-    }).from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].email, decoded.email.toLowerCase())).limit(1);
-    if (!admin || !admin.isActive) {
-        throw new AdminAuthError('This account is not authorized as a store administrator.', 403);
+    }).from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].firebaseUid, uid)).limit(1);
+    if (!admin || !admin.isActive || admin.email.toLowerCase() !== email) {
+        const bootstrapOpen = await isOwnerBootstrapOpen();
+        if (bootstrapOpen) {
+            throw new AdminAuthError('No owner administrator has been authorized yet. Complete the Initial Owner Setup first.', 403);
+        }
+        throw new AdminAuthError('This Firebase account is not authorized as a store administrator.', 403);
     }
     await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].update(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).set({
-        firebaseUid: decoded.uid,
         lastLoginAt: new Date()
     }).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].id, admin.id));
     return {
@@ -1478,6 +1586,35 @@ async function getAuthenticatedAdmin(request) {
     }
     try {
         await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$queries$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["ensureSeeded"])();
+        // 1. Verify Firebase Bearer ID token via Firebase Admin SDK when supplied
+        const bearerToken = extractBearerToken(request);
+        if (bearerToken) {
+            const decoded = await getAuthenticatedFirebaseUser(request);
+            if (!decoded) return null;
+            try {
+                const { uid, email } = assertValidAdminDecodedToken(decoded);
+                const [admin] = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select({
+                    id: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].id,
+                    email: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].email,
+                    fullName: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].fullName,
+                    role: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].role,
+                    firebaseUid: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].firebaseUid,
+                    isActive: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].isActive
+                }).from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].firebaseUid, uid)).limit(1);
+                if (admin && admin.isActive && admin.email.toLowerCase() === email) {
+                    return {
+                        id: admin.id,
+                        email: admin.email,
+                        fullName: admin.fullName,
+                        role: admin.role
+                    };
+                }
+            } catch  {
+                return null;
+            }
+            return null;
+        }
+        // 2. Fall back to HttpOnly session cookie / header issued after Firebase verification
         const cookies = parseCookies(request.headers.get('cookie'));
         const headerToken = request.headers.get('x-admin-token')?.trim();
         const sessionToken = cookies[ADMIN_COOKIE_NAME] || headerToken;
@@ -1489,9 +1626,10 @@ async function getAuthenticatedAdmin(request) {
                     email: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].email,
                     fullName: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].fullName,
                     role: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].role,
+                    firebaseUid: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].firebaseUid,
                     isActive: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].isActive
                 }).from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].id, session.adminId)).limit(1);
-                if (admin && admin.isActive) {
+                if (admin && admin.isActive && admin.firebaseUid) {
                     return {
                         id: admin.id,
                         email: admin.email,
@@ -1499,25 +1637,6 @@ async function getAuthenticatedAdmin(request) {
                         role: admin.role
                     };
                 }
-            }
-        }
-        // Verify Firebase Bearer ID token via Firebase Admin SDK
-        const decoded = await getAuthenticatedFirebaseUser(request);
-        if (decoded?.email && decoded.email_verified) {
-            const [admin] = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select({
-                id: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].id,
-                email: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].email,
-                fullName: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].fullName,
-                role: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].role,
-                isActive: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].isActive
-            }).from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].email, decoded.email.toLowerCase())).limit(1);
-            if (admin && admin.isActive) {
-                return {
-                    id: admin.id,
-                    email: admin.email,
-                    fullName: admin.fullName,
-                    role: admin.role
-                };
             }
         }
     } catch (err) {
@@ -1594,11 +1713,19 @@ function getAdminApp() {
         return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2d$admin$2f$lib$2f$esm$2f$app$2f$index$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["getApp"])();
     }
     const projectId = resolveFirebaseProjectId();
+    const expectedClientProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() || __TURBOPACK__imported__module__$5b$project$5d2f$firebase$2d$applet$2d$config$2e$json$2e5b$json$5d2e$cjs__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].projectId;
     const serviceAccount = parseServiceAccountFromEnv();
+    if (projectId !== expectedClientProjectId) {
+        console.warn(`Firebase Admin projectId (${projectId}) differs from client projectId (${expectedClientProjectId}). Client tokens will fail verification if these projects do not match.`);
+    }
     if (serviceAccount) {
+        const resolvedProjectId = serviceAccount.projectId || projectId;
+        if (resolvedProjectId !== expectedClientProjectId) {
+            console.warn(`Firebase service account projectId (${resolvedProjectId}) differs from client projectId (${expectedClientProjectId}).`);
+        }
         return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2d$admin$2f$lib$2f$esm$2f$app$2f$index$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["initializeApp"])({
             credential: (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2d$admin$2f$lib$2f$esm$2f$app$2f$index$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["cert"])(serviceAccount),
-            projectId: serviceAccount.projectId || projectId
+            projectId: resolvedProjectId
         });
     }
     return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2d$admin$2f$lib$2f$esm$2f$app$2f$index$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["initializeApp"])({

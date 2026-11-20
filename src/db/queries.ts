@@ -1,6 +1,5 @@
 import crypto from 'node:crypto';
-import bcrypt from 'bcryptjs';
-import { asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import { db, hasConfiguredDatabase, pool } from './index.ts';
 import {
   administratorAccounts,
@@ -300,28 +299,7 @@ export async function ensureSeeded(): Promise<void> {
             .onConflictDoNothing({ target: products.slug });
         }
 
-        // 3. Seed owner administrator account if no admin exists
-        const existingAdmins = await db
-          .select({ id: administratorAccounts.id })
-          .from(administratorAccounts)
-          .limit(1);
-
-        if (existingAdmins.length === 0) {
-          const adminEmail = (process.env.ADMIN_EMAIL || 'rosemyriam01@gmail.com').trim().toLowerCase();
-          const initialPassword = process.env.ADMIN_INITIAL_PASSWORD || 'UrFoodBox#2026';
-          const passwordHash = await bcrypt.hash(initialPassword, 10);
-
-          await db
-            .insert(administratorAccounts)
-            .values({
-              email: adminEmail,
-              fullName: 'UrFoodBox Owner',
-              passwordHash,
-              role: 'owner',
-              isActive: true,
-            })
-            .onConflictDoNothing({ target: administratorAccounts.email });
-        }
+        // Administrator accounts are provisioned strictly via Firebase Authentication + server-authorized first-owner bootstrap (never hardcoded).
       } catch (error) {
         seedPromise = null;
         console.error('Database seed failed:', error);
@@ -339,6 +317,21 @@ export async function ensureSeeded(): Promise<void> {
     })();
   }
   return seedPromise;
+}
+
+export async function hasClaimedFirebaseOwner(): Promise<boolean> {
+  await ensureSeeded();
+  const existing = await db
+    .select({ id: administratorAccounts.id })
+    .from(administratorAccounts)
+    .where(
+      and(
+        isNotNull(administratorAccounts.firebaseUid),
+        eq(administratorAccounts.isActive, true)
+      )
+    )
+    .limit(1);
+  return existing.length > 0;
 }
 
 export async function getStorefrontData() {
