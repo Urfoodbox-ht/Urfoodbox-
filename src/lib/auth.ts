@@ -1,12 +1,21 @@
 import crypto from 'node:crypto';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import { eq } from 'drizzle-orm';
-import { adminAuth } from './firebase-admin.ts';
+import { verifyFirebaseIdToken } from './firebase-admin.ts';
 import { db, hasConfiguredDatabase, resolvePostgresUrl } from '../db/index.ts';
 import { ensureSeeded } from '../db/queries.ts';
 import { administratorAccounts } from '../db/schema.ts';
 
 export const ADMIN_COOKIE_NAME = 'ufb_admin_session';
+
+export class AdminAuthError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'AdminAuthError';
+    this.status = status;
+  }
+}
 
 const getSessionSecret = (): string => {
   if (process.env.ADMIN_SESSION_SECRET && process.env.ADMIN_SESSION_SECRET.length >= 16) {
@@ -133,19 +142,76 @@ export function buildAdminCookieConfig(request: Request, token: string) {
   };
 }
 
-export async function getAuthenticatedFirebaseUser(
-  request: Request
-): Promise<DecodedIdToken | null> {
+export function extractBearerToken(request: Request): string | null {
   const authHeader = request.headers.get('authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
   }
   const token = authHeader.slice('Bearer '.length).trim();
+  return token || null;
+}
+
+export async function getAuthenticatedFirebaseUser(
+  request: Request
+): Promise<DecodedIdToken | null> {
+  const token = extractBearerToken(request);
+  if (!token) {
+    return null;
+  }
   try {
-    return await adminAuth.verifyIdToken(token);
+    return await verifyFirebaseIdToken(token);
   } catch {
     return null;
   }
+}
+
+export async function authenticateAdminWithFirebaseToken(
+  idToken: string
+): Promise<AuthenticatedAdmin> {
+  await ensureSeeded();
+
+  let decoded: DecodedIdToken;
+  try {
+    decoded = await verifyFirebaseIdToken(idToken);
+  } catch (err) {
+    console.error('Firebase Admin ID token verification failed:', err);
+    throw new AdminAuthError('Invalid or expired Firebase authentication token.', 401);
+  }
+
+  if (!decoded.email || !decoded.email_verified) {
+    throw new AdminAuthError('Verified email required for administrator sign-in.', 401);
+  }
+
+  const [admin] = await db
+    .select({
+      id: administratorAccounts.id,
+      email: administratorAccounts.email,
+      fullName: administratorAccounts.fullName,
+      role: administratorAccounts.role,
+      isActive: administratorAccounts.isActive,
+    })
+    .from(administratorAccounts)
+    .where(eq(administratorAccounts.email, decoded.email.toLowerCase()))
+    .limit(1);
+
+  if (!admin || !admin.isActive) {
+    throw new AdminAuthError(
+      'This account is not authorized as a store administrator.',
+      403
+    );
+  }
+
+  await db
+    .update(administratorAccounts)
+    .set({ firebaseUid: decoded.uid, lastLoginAt: new Date() })
+    .where(eq(administratorAccounts.id, admin.id));
+
+  return {
+    id: admin.id,
+    email: admin.email,
+    fullName: admin.fullName,
+    role: admin.role,
+  };
 }
 
 export async function getAuthenticatedAdmin(
@@ -187,7 +253,7 @@ export async function getAuthenticatedAdmin(
       }
     }
 
-    // Also support Firebase Bearer token for verified owner Google Sign-In
+    // Verify Firebase Bearer ID token via Firebase Admin SDK
     const decoded = await getAuthenticatedFirebaseUser(request);
     if (decoded?.email && decoded.email_verified) {
       const [admin] = await db

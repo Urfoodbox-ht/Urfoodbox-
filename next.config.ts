@@ -11,7 +11,8 @@ export default function nextConfig(phase: string): NextConfig {
     images: {
       unoptimized: true,
     },
-    serverExternalPackages: ['pg', 'firebase-admin', 'bcryptjs'],
+    transpilePackages: ['firebase-admin'],
+    serverExternalPackages: ['pg'],
     async headers() {
       return [
         {

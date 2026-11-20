@@ -5,21 +5,50 @@ import { db } from '../../../../db/index.ts';
 import { ensureSeeded } from '../../../../db/queries.ts';
 import { administratorAccounts } from '../../../../db/schema.ts';
 import {
+  AdminAuthError,
+  authenticateAdminWithFirebaseToken,
   buildAdminCookieConfig,
   createAdminSessionToken,
+  extractBearerToken,
 } from '../../../../lib/auth.ts';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
     await ensureSeeded();
-    const body = await request.json().catch(() => ({}));
-    const { email, password } = body || {};
+    const body = (await request.json().catch(() => ({}))) as {
+      email?: unknown;
+      password?: unknown;
+      idToken?: unknown;
+    };
 
+    const bearerToken = extractBearerToken(request);
+    const bodyIdToken = typeof body?.idToken === 'string' ? body.idToken.trim() : '';
+    const firebaseIdToken = bearerToken || bodyIdToken;
+
+    if (firebaseIdToken) {
+      const admin = await authenticateAdminWithFirebaseToken(firebaseIdToken);
+      const token = createAdminSessionToken({
+        adminId: admin.id,
+        email: admin.email,
+        role: admin.role,
+      });
+
+      const response = NextResponse.json({
+        admin,
+        sessionToken: token,
+        authProvider: 'firebase',
+      });
+      response.cookies.set(buildAdminCookieConfig(request, token));
+      return response;
+    }
+
+    const { email, password } = body || {};
     if (typeof email !== 'string' || typeof password !== 'string') {
       return NextResponse.json(
-        { error: 'Email and password are required.' },
+        { error: 'Firebase ID token or email and password are required.' },
         { status: 400 }
       );
     }
@@ -64,10 +93,14 @@ export async function POST(request: Request) {
         role: admin.role,
       },
       sessionToken: token,
+      authProvider: 'credentials',
     });
     response.cookies.set(buildAdminCookieConfig(request, token));
     return response;
   } catch (error) {
+    if (error instanceof AdminAuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('Admin login error:', error);
     const message =
       error instanceof Error &&

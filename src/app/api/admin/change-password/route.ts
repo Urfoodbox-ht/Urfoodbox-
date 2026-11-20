@@ -5,6 +5,7 @@ import { db } from '../../../../db/index.ts';
 import { administratorAccounts } from '../../../../db/schema.ts';
 import { getAuthenticatedAdmin } from '../../../../lib/auth.ts';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {

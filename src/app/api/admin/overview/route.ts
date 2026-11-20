@@ -9,6 +9,7 @@ import {
 import { subscriptionRecords } from '../../../../db/schema.ts';
 import { getAuthenticatedAdmin } from '../../../../lib/auth.ts';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {

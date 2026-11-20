@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ADMIN_COOKIE_NAME, isHttpsRequest } from '../../../../lib/auth.ts';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {

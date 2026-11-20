@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { getRedirectResult, signInWithPopup, signInWithRedirect } from 'firebase/auth';
+import { getRedirectResult, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import {
   ArrowLeft,
   Check,
@@ -212,7 +212,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           const redirectCred = await getRedirectResult(auth);
           if (redirectCred?.user) {
             const idToken = await redirectCred.user.getIdToken();
-            const { res: gRes, data: gData } = await safeFetchJson('/api/admin/login-google', {
+            const { res: gRes, data: gData } = await safeFetchJson('/api/admin/login', {
               method: 'POST',
               headers: { Authorization: `Bearer ${idToken}` },
               credentials: 'include',
@@ -229,7 +229,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }
         }
 
-        const { res, data } = await safeFetchJson('/api/admin/session', buildAdminFetchInit());
+        const sessionInit = buildAdminFetchInit();
+        if (auth.currentUser) {
+          try {
+            const firebaseToken = await auth.currentUser.getIdToken();
+            const headers = new Headers(sessionInit.headers);
+            if (!headers.has('authorization')) {
+              headers.set('Authorization', `Bearer ${firebaseToken}`);
+            }
+            sessionInit.headers = headers;
+          } catch {
+            // Fall back to cookie / stored token
+          }
+        }
+
+        const { res, data } = await safeFetchJson('/api/admin/session', sessionInit);
         if (res.ok && data.admin) {
           setAdminUser(data.admin);
           await loadOverview();
@@ -274,7 +288,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const cred = await signInWithPopup(auth, googleAuthProvider);
       const idToken = await cred.user.getIdToken();
-      const { res, data } = await safeFetchJson('/api/admin/login-google', {
+      const { res, data } = await safeFetchJson('/api/admin/login', {
         method: 'POST',
         headers: { Authorization: `Bearer ${idToken}` },
         credentials: 'include',
@@ -310,6 +324,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleLogout = async () => {
     writeStoredAdminToken(null);
+    try {
+      await signOut(auth);
+    } catch {
+      // Ignore Firebase client sign-out errors
+    }
     try {
       await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' });
     } catch {

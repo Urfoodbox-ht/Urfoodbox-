@@ -1,11 +1,6 @@
 {
+  "/admin/page": "app/admin/page.js",
   "/api/admin/login/route": "app/api/admin/login/route.js",
-  "/api/admin/overview/route": "app/api/admin/overview/route.js",
   "/api/admin/session/route": "app/api/admin/session/route.js",
-  "/api/health/route": "app/api/health/route.js",
-  "/api/orders/route": "app/api/orders/route.js",
-  "/api/orders/track/[reference]/route": "app/api/orders/track/[reference]/route.js",
-  "/api/storefront/route": "app/api/storefront/route.js",
-  "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
-  "/page": "app/page.js"
+  "/api/health/route": "app/api/health/route.js"
 }
