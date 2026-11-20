@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
+import {
+  getRedirectResult,
+  onAuthStateChanged,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+  type User,
+} from 'firebase/auth';
 import { CartDrawer } from './CartDrawer.tsx';
 import { CustomerAccountModal } from './CustomerAccountModal.tsx';
 import { ProductModal } from './ProductModal.tsx';
@@ -46,7 +53,7 @@ export function StorefrontShell({
   initialComments = [],
 }: StorefrontShellProps) {
   const router = useRouter();
-  const hasInitialData = initialProducts.length > 0 || initialSettings !== null;
+  const hasInitialData = initialProducts.length > 0 && initialSettings !== null;
 
   const [lang, setLang] = useState<Language>('en');
   const [currency, setCurrency] = useState<Currency>('USD');
@@ -138,7 +145,7 @@ export function StorefrontShell({
     setStoreError(null);
     try {
       const { res, data } = await safeFetchJson<{
-        settings: BusinessSettings;
+        settings: BusinessSettings | null;
         products: Product[];
         comments: CustomerComment[];
         error?: string;
@@ -148,17 +155,27 @@ export function StorefrontShell({
       setProducts(data.products || []);
       setComments(data.comments || []);
     } catch (err: any) {
-      if (!background) {
+      if (!background || products.length === 0) {
         setStoreError(err.message || 'Could not load storefront catalog.');
       }
     } finally {
       setLoadingStore(false);
     }
-  }, []);
+  }, [products.length]);
 
   useEffect(() => {
     fetchStorefront(hasInitialData);
   }, [fetchStorefront, hasInitialData]);
+
+  // Safely prune removed product IDs from persisted cart once catalog is confirmed loaded
+  useEffect(() => {
+    if (!prefsLoaded || loadingStore || storeError || products.length === 0) return;
+    const validIds = new Set(products.map((p) => p.id));
+    setCart((prev) => {
+      const filtered = prev.filter((item) => validIds.has(item.productId));
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [prefsLoaded, loadingStore, storeError, products]);
 
   const getAuthToken = useCallback(async (): Promise<string | null> => {
     if (!auth.currentUser) return null;
@@ -196,6 +213,17 @@ export function StorefrontShell({
   }, []);
 
   useEffect(() => {
+    getRedirectResult(auth)
+      .then((cred) => {
+        if (cred?.user) {
+          setFirebaseUser(cred.user);
+          loadCustomerAccount(cred.user);
+        }
+      })
+      .catch(() => {
+        // Ignore non-fatal redirect check errors
+      });
+
     const unsub = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
       loadCustomerAccount(user);
@@ -208,6 +236,19 @@ export function StorefrontShell({
     try {
       const cred = await signInWithPopup(auth, googleAuthProvider);
       await loadCustomerAccount(cred.user);
+    } catch (err: any) {
+      const code = err?.code || '';
+      const isTopLevel = typeof window !== 'undefined' && window.self === window.top;
+      if (
+        isTopLevel &&
+        (code === 'auth/popup-blocked' ||
+          code === 'auth/operation-not-supported-in-this-environment' ||
+          code === 'auth/web-storage-unsupported')
+      ) {
+        await signInWithRedirect(auth, googleAuthProvider);
+        return;
+      }
+      // User closing popup is non-fatal
     } finally {
       setSigningIn(false);
     }

@@ -1,10 +1,28 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F47B20' },
+    { media: '(prefers-color-scheme: dark)', color: '#171717' },
+  ],
+};
 
 export const metadata: Metadata = {
   title: 'UrFoodBox — Machew devan pot kay ou.',
   description:
     'Machew devan pot kay ou. Order curated grocery food boxes online in USD or HTG and get doorstep delivery.',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'UrFoodBox',
+  },
+  formatDetection: {
+    telephone: false,
+  },
   openGraph: {
     title: 'UrFoodBox — Machew devan pot kay ou.',
     description:
@@ -16,6 +34,7 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: '/assets/aistudio/IMG-20261115-WA0000_6c778049_6c778049.jpg',
+    apple: '/assets/aistudio/IMG-20261115-WA0000_6c778049_6c778049.jpg',
   },
 };
 

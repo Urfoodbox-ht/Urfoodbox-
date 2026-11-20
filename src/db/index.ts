@@ -6,10 +6,27 @@ declare global {
   var _postgresPool: Pool | undefined;
 }
 
+export function cleanEnvConnectionValue(value?: string): string | null {
+  if (!value) return null;
+  let cleaned = value.trim();
+  // Handle accidental copy-paste of Neon CLI snippet like: psql 'postgresql://...'
+  if (/^psql\s+/i.test(cleaned)) {
+    cleaned = cleaned.replace(/^psql\s+/i, '').trim();
+  }
+  // Strip wrapping single or double quotes if pasted with quotes
+  if (
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'"))
+  ) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  return cleaned || null;
+}
+
 export const isValidPostgresUrl = (value?: string): value is string => {
-  if (!value) return false;
-  const trimmed = value.trim();
-  return trimmed.startsWith('postgres://') || trimmed.startsWith('postgresql://');
+  const cleaned = cleanEnvConnectionValue(value);
+  if (!cleaned) return false;
+  return cleaned.startsWith('postgres://') || cleaned.startsWith('postgresql://');
 };
 
 export function resolvePostgresUrl(): string | null {
@@ -22,8 +39,9 @@ export function resolvePostgresUrl(): string | null {
     process.env.SUPABASE_DB_URL,
   ];
   for (const candidate of candidates) {
-    if (isValidPostgresUrl(candidate)) {
-      return candidate.trim();
+    const cleaned = cleanEnvConnectionValue(candidate);
+    if (cleaned && (cleaned.startsWith('postgres://') || cleaned.startsWith('postgresql://'))) {
+      return cleaned;
     }
   }
   return null;
@@ -34,18 +52,52 @@ export function hasConfiguredDatabase(): boolean {
   return Boolean(process.env.SQL_HOST && process.env.SQL_USER && process.env.SQL_DB_NAME);
 }
 
+function normalizeConnectionForPool(rawUrl: string): {
+  connectionString: string;
+  ssl: false | { rejectUnauthorized: boolean };
+} {
+  let sslDisableRequested = process.env.DATABASE_SSL === 'false';
+  let sanitizedUrl = rawUrl;
+
+  try {
+    const parsed = new URL(rawUrl);
+    const sslMode = parsed.searchParams.get('sslmode')?.toLowerCase();
+    const isLocalHost =
+      parsed.hostname === 'localhost' ||
+      parsed.hostname === '127.0.0.1' ||
+      parsed.hostname === '::1';
+
+    if (sslMode === 'disable' || isLocalHost) {
+      sslDisableRequested = true;
+    } else if (sslMode && sslMode !== 'verify-full') {
+      // pg@8 treats sslmode=require/prefer/verify-ca as verify-full and overrides the ssl option.
+      // Remove sslmode/channel_binding so our explicit SSL config governs TLS cleanly on Vercel & poolers.
+      parsed.searchParams.delete('sslmode');
+      parsed.searchParams.delete('channel_binding');
+      sanitizedUrl = parsed.toString();
+    } else if (parsed.searchParams.has('channel_binding')) {
+      parsed.searchParams.delete('channel_binding');
+      sanitizedUrl = parsed.toString();
+    }
+  } catch {
+    // Keep rawUrl if URL constructor cannot parse custom socket/host syntax
+  }
+
+  return {
+    connectionString: sanitizedUrl,
+    ssl: sslDisableRequested ? false : { rejectUnauthorized: false },
+  };
+}
+
 export const createPool = () => {
   if (!global._postgresPool) {
     const databaseUrl = resolvePostgresUrl();
     if (databaseUrl) {
-      const useSsl =
-        process.env.DATABASE_SSL !== 'false' &&
-        !databaseUrl.includes('localhost') &&
-        !databaseUrl.includes('127.0.0.1');
+      const { connectionString, ssl } = normalizeConnectionForPool(databaseUrl);
 
       global._postgresPool = new Pool({
-        connectionString: databaseUrl,
-        ssl: useSsl ? { rejectUnauthorized: false } : false,
+        connectionString,
+        ssl,
         max: 5,
         idleTimeoutMillis: 20000,
         connectionTimeoutMillis: 15000,

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Minus, Package, Plus, ShoppingCart, X } from 'lucide-react';
 import {
   formatMoney,
@@ -29,6 +29,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 }) => {
   const [quantity, setQuantity] = useState(1);
 
+  useEffect(() => {
+    setQuantity(1);
+  }, [product?.id]);
+
   if (!product) return null;
 
   const title = getLocalizedProductName(product, lang);
@@ -38,7 +42,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px]" onClick={onClose} />
 
-      <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] text-[var(--ufb-text)] shadow-2xl">
+      <div className="relative z-10 max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] text-[var(--ufb-text)] shadow-2xl">
         <button
           type="button"
           onClick={onClose}

@@ -56,6 +56,22 @@ export async function POST(request: Request) {
       );
     }
 
+    const normalizedItems: { productId: number; quantity: number }[] = [];
+    for (const rawItem of items) {
+      const productId = Number(rawItem?.productId);
+      const quantity = Number(rawItem?.quantity);
+      if (!Number.isInteger(productId) || productId <= 0) {
+        return NextResponse.json({ error: 'Invalid product selected in cart.' }, { status: 400 });
+      }
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+        return NextResponse.json(
+          { error: 'Product quantity must be between 1 and 99.' },
+          { status: 400 }
+        );
+      }
+      normalizedItems.push({ productId, quantity });
+    }
+
     let customerAccountId: number | null = null;
     const firebaseUser = await getAuthenticatedFirebaseUser(request);
     if (firebaseUser?.uid && firebaseUser?.email) {
@@ -77,10 +93,7 @@ export async function POST(request: Request) {
       householdSize: parsedHouseholdSize,
       currency,
       paymentMethod,
-      items: items.map((i: any) => ({
-        productId: Number(i.productId),
-        quantity: Number(i.quantity),
-      })),
+      items: normalizedItems,
     });
 
     return NextResponse.json(
@@ -100,7 +113,12 @@ export async function POST(request: Request) {
     );
   } catch (error: any) {
     const status =
-      error.message?.includes('unavailable') || error.message?.includes('empty') ? 400 : 500;
+      error.message?.includes('unavailable') ||
+      error.message?.includes('empty') ||
+      error.message?.includes('exists') ||
+      error.message?.includes('invalid')
+        ? 400
+        : 500;
     return NextResponse.json(
       { error: error.message || 'Failed to submit order.' },
       { status }

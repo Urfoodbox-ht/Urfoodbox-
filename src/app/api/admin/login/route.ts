@@ -63,6 +63,7 @@ export async function POST(request: Request) {
         fullName: admin.fullName,
         role: admin.role,
       },
+      sessionToken: token,
     });
     response.cookies.set(buildAdminCookieConfig(request, token));
     return response;

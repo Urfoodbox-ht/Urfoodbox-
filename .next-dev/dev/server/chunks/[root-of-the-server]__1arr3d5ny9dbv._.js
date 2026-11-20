@@ -91,22 +91,28 @@ var __turbopack_async_dependencies__ = __turbopack_handle_async_dependencies__([
 ;
 const dynamic = 'force-dynamic';
 async function GET() {
+    const noStoreHeaders = {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate'
+    };
     try {
         const data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$queries$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["getStorefrontData"])();
         const logoUrl = data.settings?.logoImageId ? `/api/images/${data.settings.logoImageId}` : '/assets/aistudio/IMG-20261115-WA0000_6c778049_6c778049.jpg';
         return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-            settings: {
+            settings: data.settings ? {
                 ...data.settings,
                 logoUrl
-            },
-            products: data.products,
-            comments: data.comments
+            } : null,
+            products: data.products || [],
+            comments: data.comments || []
+        }, {
+            headers: noStoreHeaders
         });
     } catch (error) {
         return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
             error: error.message || 'Failed to load storefront data'
         }, {
-            status: 500
+            status: 500,
+            headers: noStoreHeaders
         });
     }
 }
@@ -117,6 +123,8 @@ __turbopack_async_result__();
 
 return __turbopack_context__.a(async (__turbopack_handle_async_dependencies__, __turbopack_async_result__) => { try {
 __turbopack_context__.s([
+    "cleanEnvConnectionValue",
+    ()=>cleanEnvConnectionValue,
     "createPool",
     ()=>createPool,
     "db",
@@ -141,10 +149,23 @@ var __turbopack_async_dependencies__ = __turbopack_handle_async_dependencies__([
 ;
 ;
 ;
+function cleanEnvConnectionValue(value) {
+    if (!value) return null;
+    let cleaned = value.trim();
+    // Handle accidental copy-paste of Neon CLI snippet like: psql 'postgresql://...'
+    if (/^psql\s+/i.test(cleaned)) {
+        cleaned = cleaned.replace(/^psql\s+/i, '').trim();
+    }
+    // Strip wrapping single or double quotes if pasted with quotes
+    if (cleaned.startsWith('"') && cleaned.endsWith('"') || cleaned.startsWith("'") && cleaned.endsWith("'")) {
+        cleaned = cleaned.slice(1, -1).trim();
+    }
+    return cleaned || null;
+}
 const isValidPostgresUrl = (value)=>{
-    if (!value) return false;
-    const trimmed = value.trim();
-    return trimmed.startsWith('postgres://') || trimmed.startsWith('postgresql://');
+    const cleaned = cleanEnvConnectionValue(value);
+    if (!cleaned) return false;
+    return cleaned.startsWith('postgres://') || cleaned.startsWith('postgresql://');
 };
 function resolvePostgresUrl() {
     const candidates = [
@@ -156,8 +177,9 @@ function resolvePostgresUrl() {
         process.env.SUPABASE_DB_URL
     ];
     for (const candidate of candidates){
-        if (isValidPostgresUrl(candidate)) {
-            return candidate.trim();
+        const cleaned = cleanEnvConnectionValue(candidate);
+        if (cleaned && (cleaned.startsWith('postgres://') || cleaned.startsWith('postgresql://'))) {
+            return cleaned;
         }
     }
     return null;
@@ -166,16 +188,43 @@ function hasConfiguredDatabase() {
     if (resolvePostgresUrl()) return true;
     return Boolean(process.env.SQL_HOST && process.env.SQL_USER && process.env.SQL_DB_NAME);
 }
+function normalizeConnectionForPool(rawUrl) {
+    let sslDisableRequested = process.env.DATABASE_SSL === 'false';
+    let sanitizedUrl = rawUrl;
+    try {
+        const parsed = new URL(rawUrl);
+        const sslMode = parsed.searchParams.get('sslmode')?.toLowerCase();
+        const isLocalHost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1';
+        if (sslMode === 'disable' || isLocalHost) {
+            sslDisableRequested = true;
+        } else if (sslMode && sslMode !== 'verify-full') {
+            // pg@8 treats sslmode=require/prefer/verify-ca as verify-full and overrides the ssl option.
+            // Remove sslmode/channel_binding so our explicit SSL config governs TLS cleanly on Vercel & poolers.
+            parsed.searchParams.delete('sslmode');
+            parsed.searchParams.delete('channel_binding');
+            sanitizedUrl = parsed.toString();
+        } else if (parsed.searchParams.has('channel_binding')) {
+            parsed.searchParams.delete('channel_binding');
+            sanitizedUrl = parsed.toString();
+        }
+    } catch  {
+    // Keep rawUrl if URL constructor cannot parse custom socket/host syntax
+    }
+    return {
+        connectionString: sanitizedUrl,
+        ssl: sslDisableRequested ? false : {
+            rejectUnauthorized: false
+        }
+    };
+}
 const createPool = ()=>{
     if (!/*TURBOPACK member replacement*/ __turbopack_context__.g._postgresPool) {
         const databaseUrl = resolvePostgresUrl();
         if (databaseUrl) {
-            const useSsl = process.env.DATABASE_SSL !== 'false' && !databaseUrl.includes('localhost') && !databaseUrl.includes('127.0.0.1');
+            const { connectionString, ssl } = normalizeConnectionForPool(databaseUrl);
             /*TURBOPACK member replacement*/ __turbopack_context__.g._postgresPool = new __TURBOPACK__imported__module__$5b$externals$5d2f$pg__$5b$external$5d$__$28$pg$2c$__esm_import$2c$__$5b$project$5d2f$node_modules$2f$pg$29$__["Pool"]({
-                connectionString: databaseUrl,
-                ssl: useSsl ? {
-                    rejectUnauthorized: false
-                } : false,
+                connectionString,
+                ssl,
                 max: 5,
                 idleTimeoutMillis: 20000,
                 connectionTimeoutMillis: 15000
@@ -271,8 +320,9 @@ async function ensureSchemaExists() {
     if (allTablesExist && row.has_box_period && row.has_household_size) {
         return;
     }
-    if (!allTablesExist) {
-        await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["pool"].query(`
+    try {
+        if (!allTablesExist) {
+            await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["pool"].query(`
     CREATE TABLE IF NOT EXISTS products (
       id SERIAL PRIMARY KEY,
       slug TEXT NOT NULL UNIQUE,
@@ -409,12 +459,19 @@ async function ensureSchemaExists() {
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `);
-    }
-    if (!row?.has_box_period) {
-        await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["pool"].query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS box_period TEXT NOT NULL DEFAULT '';`);
-    }
-    if (!row?.has_household_size) {
-        await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["pool"].query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS household_size INTEGER NOT NULL DEFAULT 1;`);
+        }
+        if (!row?.has_box_period) {
+            await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["pool"].query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS box_period TEXT NOT NULL DEFAULT '';`);
+        }
+        if (!row?.has_household_size) {
+            await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["pool"].query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS household_size INTEGER NOT NULL DEFAULT 1;`);
+        }
+    } catch (err) {
+        // Handle concurrent cold-start CREATE TABLE race conditions gracefully (23505 / 42P07)
+        if (err?.code === '23505' || err?.code === '42P07') {
+            return;
+        }
+        throw err;
     }
 }
 async function ensureSeeded() {
@@ -570,6 +627,7 @@ async function getStorefrontData() {
 }
 async function getAllCommentsForAdmin() {
     try {
+        await ensureSeeded();
         return await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select().from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["customerComments"]).orderBy((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$select$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["desc"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["customerComments"].createdAt));
     } catch (error) {
         console.error('Database query failed in getAllCommentsForAdmin:', error);
@@ -580,6 +638,7 @@ async function getAllCommentsForAdmin() {
 }
 async function createCustomerComment(input) {
     try {
+        await ensureSeeded();
         const [created] = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].insert(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["customerComments"]).values({
             authorName: input.authorName.trim(),
             rating: Math.max(1, Math.min(5, Math.floor(input.rating))),
@@ -596,6 +655,7 @@ async function createCustomerComment(input) {
 }
 async function getImageById(imageId) {
     try {
+        await ensureSeeded();
         const [img] = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select().from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["productImages"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["productImages"].id, imageId)).limit(1);
         return img || null;
     } catch (error) {
@@ -607,6 +667,7 @@ async function getImageById(imageId) {
 }
 async function getOrCreateCustomerAccount(uid, email, fullName) {
     try {
+        await ensureSeeded();
         const normalizedEmail = email.trim().toLowerCase();
         const existing = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select().from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["customerAccounts"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["customerAccounts"].uid, uid)).limit(1);
         if (existing.length > 0) {
@@ -644,10 +705,10 @@ async function createOrderInDb(input) {
     try {
         await ensureSeeded();
         const productIds = [
-            ...new Set(input.items.map((item)=>item.productId))
+            ...new Set(input.items.map((item)=>Number(item.productId)).filter((id)=>Number.isInteger(id) && id > 0))
         ];
-        if (productIds.length === 0) {
-            throw new Error('Cart is empty.');
+        if (productIds.length === 0 || productIds.length !== new Set(input.items.map((i)=>i.productId)).size) {
+            throw new Error('Cart contains an invalid product reference.');
         }
         const dbProducts = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select().from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["products"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["inArray"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["products"].id, productIds));
         const productMap = new Map(dbProducts.map((p)=>[
@@ -714,7 +775,7 @@ async function createOrderInDb(input) {
         return createdOrder;
     } catch (error) {
         console.error('Database query failed in createOrderInDb:', error);
-        if (error instanceof Error && (error.message.includes('unavailable') || error.message.includes('empty') || error.message.includes('exists'))) {
+        if (error instanceof Error && (error.message.includes('unavailable') || error.message.includes('empty') || error.message.includes('exists') || error.message.includes('invalid'))) {
             throw error;
         }
         throw new Error('Unable to submit your order. Please try again.', {
@@ -724,6 +785,7 @@ async function createOrderInDb(input) {
 }
 async function getAllOrdersWithItems() {
     try {
+        await ensureSeeded();
         const allOrders = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select().from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["orders"]).orderBy((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$select$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["desc"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["orders"].createdAt));
         if (allOrders.length === 0) return [];
         const allItems = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select().from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["orderItems"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["inArray"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["orderItems"].orderId, allOrders.map((o)=>o.id)));
@@ -746,6 +808,7 @@ async function getAllOrdersWithItems() {
 }
 async function getCustomerFullProfile(uid, email) {
     try {
+        await ensureSeeded();
         const customer = await getOrCreateCustomerAccount(uid, email);
         const customerOrders = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select().from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["orders"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["orders"].customerAccountId, customer.id)).orderBy((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$select$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["desc"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["orders"].createdAt));
         const orderIds = customerOrders.map((o)=>o.id);
@@ -774,6 +837,7 @@ async function getCustomerFullProfile(uid, email) {
 }
 async function updateCustomerProfile(uid, updates) {
     try {
+        await ensureSeeded();
         const [updated] = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].update(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["customerAccounts"]).set({
             ...updates.fullName !== undefined ? {
                 fullName: updates.fullName

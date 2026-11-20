@@ -61,7 +61,7 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
   const [newAddrLabel, setNewAddrLabel] = useState('');
   const [newAddrText, setNewAddrText] = useState('');
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   // Subscription preference form
   const [subFrequency, setSubFrequency] = useState<'weekly' | 'monthly'>('monthly');
@@ -76,6 +76,12 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
       setDefaultDeliveryAddress(profile.defaultDeliveryAddress || '');
     }
   }, [profile]);
+
+  React.useEffect(() => {
+    if (!subProductId && products.length > 0) {
+      setSubProductId(String(products[0].id));
+    }
+  }, [products, subProductId]);
 
   if (!isOpen) return null;
 
@@ -100,9 +106,9 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
       });
       if (!res.ok) throw new Error(data.error || 'Failed to save profile');
       await onRefreshAccount();
-      setFeedback(t.account.savedSuccess);
+      setFeedback({ type: 'ok', text: t.account.savedSuccess });
     } catch (err: any) {
-      setFeedback(err.message);
+      setFeedback({ type: 'err', text: err.message || 'Failed to save profile' });
     } finally {
       setSaving(false);
     }
@@ -140,6 +146,8 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
       setNewAddrLabel('');
       setNewAddrText('');
       await onRefreshAccount();
+    } catch (err: any) {
+      setFeedback({ type: 'err', text: err.message || 'Could not save address' });
     } finally {
       setSaving(false);
     }
@@ -147,18 +155,24 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
 
   const handleRemoveSavedAddress = async (addrId: string) => {
     if (!profile) return;
-    const token = await getAuthToken();
-    if (!token) return;
-    const updatedAddresses = (profile.savedAddresses || []).filter((a) => a.id !== addrId);
-    await safeFetchJson('/api/customer/me', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ savedAddresses: updatedAddresses }),
-    });
-    await onRefreshAccount();
+    setFeedback(null);
+    try {
+      const token = await getAuthToken();
+      if (!token) return;
+      const updatedAddresses = (profile.savedAddresses || []).filter((a) => a.id !== addrId);
+      const { res, data } = await safeFetchJson('/api/customer/me', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ savedAddresses: updatedAddresses }),
+      });
+      if (!res.ok) throw new Error(data.error || 'Could not remove address');
+      await onRefreshAccount();
+    } catch (err: any) {
+      setFeedback({ type: 'err', text: err.message || 'Could not remove address' });
+    }
   };
 
   const handleSaveSubscription = async (e: React.FormEvent) => {
@@ -185,9 +199,9 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
       if (!res.ok) throw new Error(data.error || 'Could not save preference');
       setSubNotes('');
       await onRefreshAccount();
-      setFeedback(t.account.subSaved);
+      setFeedback({ type: 'ok', text: t.account.subSaved });
     } catch (err: any) {
-      setFeedback(err.message);
+      setFeedback({ type: 'err', text: err.message || 'Could not save preference' });
     } finally {
       setSaving(false);
     }
@@ -197,7 +211,7 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px]" onClick={onClose} />
 
-      <div className="relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] text-[var(--ufb-text)] shadow-2xl">
+      <div className="relative z-10 flex max-h-[90dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] text-[var(--ufb-text)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--ufb-border)] px-6 py-4">
           <div className="flex items-center gap-2.5">
             <User className="h-5 w-5 text-[#F47B20]" />
@@ -213,7 +227,7 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto px-5 sm:px-6 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
           {!firebaseEmail ? (
             <div className="space-y-5 py-6 text-center max-w-md mx-auto">
               <p className="text-sm text-[var(--ufb-muted)] leading-relaxed">{t.account.subtitle}</p>
@@ -273,8 +287,14 @@ export const CustomerAccountModal: React.FC<CustomerAccountModalProps> = ({
               </div>
 
               {feedback && (
-                <div className="rounded-lg border border-[#238447]/30 bg-[#238447]/10 px-4 py-2.5 text-xs font-medium text-[#238447]">
-                  {feedback}
+                <div
+                  className={`rounded-lg border px-4 py-2.5 text-xs font-medium ${
+                    feedback.type === 'ok'
+                      ? 'border-[#238447]/30 bg-[#238447]/10 text-[#238447]'
+                      : 'border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400'
+                  }`}
+                >
+                  {feedback.text}
                 </div>
               )}
 

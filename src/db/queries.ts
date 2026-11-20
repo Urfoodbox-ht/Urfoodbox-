@@ -56,8 +56,9 @@ async function ensureSchemaExists(): Promise<void> {
     return;
   }
 
-  if (!allTablesExist) {
-    await pool.query(`
+  try {
+    if (!allTablesExist) {
+      await pool.query(`
     CREATE TABLE IF NOT EXISTS products (
       id SERIAL PRIMARY KEY,
       slug TEXT NOT NULL UNIQUE,
@@ -194,17 +195,24 @@ async function ensureSchemaExists(): Promise<void> {
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `);
-  }
+    }
 
-  if (!row?.has_box_period) {
-    await pool.query(
-      `ALTER TABLE orders ADD COLUMN IF NOT EXISTS box_period TEXT NOT NULL DEFAULT '';`
-    );
-  }
-  if (!row?.has_household_size) {
-    await pool.query(
-      `ALTER TABLE orders ADD COLUMN IF NOT EXISTS household_size INTEGER NOT NULL DEFAULT 1;`
-    );
+    if (!row?.has_box_period) {
+      await pool.query(
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS box_period TEXT NOT NULL DEFAULT '';`
+      );
+    }
+    if (!row?.has_household_size) {
+      await pool.query(
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS household_size INTEGER NOT NULL DEFAULT 1;`
+      );
+    }
+  } catch (err: any) {
+    // Handle concurrent cold-start CREATE TABLE race conditions gracefully (23505 / 42P07)
+    if (err?.code === '23505' || err?.code === '42P07') {
+      return;
+    }
+    throw err;
   }
 }
 
@@ -393,6 +401,7 @@ export async function getStorefrontData() {
 
 export async function getAllCommentsForAdmin() {
   try {
+    await ensureSeeded();
     return await db
       .select()
       .from(customerComments)
@@ -409,6 +418,7 @@ export async function createCustomerComment(input: {
   commentText: string;
 }) {
   try {
+    await ensureSeeded();
     const [created] = await db
       .insert(customerComments)
       .values({
@@ -427,6 +437,7 @@ export async function createCustomerComment(input: {
 
 export async function getImageById(imageId: number) {
   try {
+    await ensureSeeded();
     const [img] = await db
       .select()
       .from(productImages)
@@ -441,6 +452,7 @@ export async function getImageById(imageId: number) {
 
 export async function getOrCreateCustomerAccount(uid: string, email: string, fullName?: string) {
   try {
+    await ensureSeeded();
     const normalizedEmail = email.trim().toLowerCase();
     const existing = await db
       .select()
@@ -504,9 +516,15 @@ export interface CreateOrderInput {
 export async function createOrderInDb(input: CreateOrderInput) {
   try {
     await ensureSeeded();
-    const productIds = [...new Set(input.items.map((item) => item.productId))];
-    if (productIds.length === 0) {
-      throw new Error('Cart is empty.');
+    const productIds = [
+      ...new Set(
+        input.items
+          .map((item) => Number(item.productId))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      ),
+    ];
+    if (productIds.length === 0 || productIds.length !== new Set(input.items.map((i) => i.productId)).size) {
+      throw new Error('Cart contains an invalid product reference.');
     }
 
     const dbProducts = await db
@@ -604,7 +622,13 @@ export async function createOrderInDb(input: CreateOrderInput) {
     return createdOrder;
   } catch (error) {
     console.error('Database query failed in createOrderInDb:', error);
-    if (error instanceof Error && (error.message.includes('unavailable') || error.message.includes('empty') || error.message.includes('exists'))) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('unavailable') ||
+        error.message.includes('empty') ||
+        error.message.includes('exists') ||
+        error.message.includes('invalid'))
+    ) {
       throw error;
     }
     throw new Error('Unable to submit your order. Please try again.', { cause: error });
@@ -613,6 +637,7 @@ export async function createOrderInDb(input: CreateOrderInput) {
 
 export async function getAllOrdersWithItems() {
   try {
+    await ensureSeeded();
     const allOrders = await db
       .select()
       .from(orders)
@@ -644,6 +669,7 @@ export async function getAllOrdersWithItems() {
 
 export async function getCustomerFullProfile(uid: string, email: string) {
   try {
+    await ensureSeeded();
     const customer = await getOrCreateCustomerAccount(uid, email);
 
     const customerOrders = await db
@@ -696,6 +722,7 @@ export async function updateCustomerProfile(
   }
 ) {
   try {
+    await ensureSeeded();
     const [updated] = await db
       .update(customerAccounts)
       .set({

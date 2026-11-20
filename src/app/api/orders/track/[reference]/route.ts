@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '../../../../../db/index.ts';
+import { ensureSeeded } from '../../../../../db/queries.ts';
 import { orderItems, orders } from '../../../../../db/schema.ts';
 
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,7 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid order reference.' }, { status: 400 });
   }
   try {
+    await ensureSeeded();
     const [order] = await db
       .select({
         id: orders.id,

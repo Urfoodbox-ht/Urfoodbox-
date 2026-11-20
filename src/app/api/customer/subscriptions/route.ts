@@ -23,11 +23,20 @@ export async function POST(request: Request) {
       );
     }
 
+    let parsedProductId: number | null = null;
+    if (productId !== undefined && productId !== null && productId !== '') {
+      const n = Number(productId);
+      if (!Number.isInteger(n) || n <= 0) {
+        return NextResponse.json({ error: 'Invalid food box selection.' }, { status: 400 });
+      }
+      parsedProductId = n;
+    }
+
     const [created] = await db
       .insert(subscriptionRecords)
       .values({
         customerAccountId: customer.id,
-        productId: productId ? Number(productId) : null,
+        productId: parsedProductId,
         frequency,
         preferredDeliveryDay:
           typeof preferredDeliveryDay === 'string' && preferredDeliveryDay.trim()

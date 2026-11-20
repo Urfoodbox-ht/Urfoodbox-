@@ -73,6 +73,21 @@ interface TrackedOrderResult {
   items: { productName: string; quantity: number; lineTotal: string }[];
 }
 
+function formatUtcDate(dateValue: string | Date): string {
+  const d = new Date(dateValue);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+}
+
+function safeHttpUrl(url?: string | null): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) {
+    return trimmed;
+  }
+  return null;
+}
+
 export const Storefront: React.FC<StorefrontProps> = ({
   settings,
   products,
@@ -393,6 +408,25 @@ export const Storefront: React.FC<StorefrontProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Mobile Quick-Jump Navigation for iOS & Android */}
+        <nav
+          aria-label="Mobile sections"
+          className="md:hidden border-t border-[var(--ufb-border)]/70 px-4 py-1.5 flex items-center gap-4 overflow-x-auto text-xs font-semibold text-[var(--ufb-muted)]"
+        >
+          <a href="#boxes" className="hover:text-[#F47B20] whitespace-nowrap shrink-0 py-0.5">
+            {t.nav.boxes}
+          </a>
+          <a href="#delivery" className="hover:text-[#F47B20] whitespace-nowrap shrink-0 py-0.5">
+            {t.nav.delivery}
+          </a>
+          <a href="#custom-box" className="hover:text-[#F47B20] whitespace-nowrap shrink-0 py-0.5">
+            {t.nav.customBox}
+          </a>
+          <a href="#track" className="hover:text-[#F47B20] whitespace-nowrap shrink-0 py-0.5">
+            {t.nav.trackOrder}
+          </a>
+        </nav>
       </div>
 
       {/* Main Foreground Content */}
@@ -481,11 +515,13 @@ export const Storefront: React.FC<StorefrontProps> = ({
             </div>
           ) : error ? (
             <div className="rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] p-8 text-center space-y-3">
-              <p className="text-sm text-red-600 dark:text-red-400">{error || t.catalog.errorLoad}</p>
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                {error || t.catalog.errorLoad}
+              </p>
               <button
                 type="button"
                 onClick={onRetry}
-                className="rounded-lg bg-[#F47B20] px-4 py-2 text-xs font-semibold text-white"
+                className="rounded-lg bg-[#F47B20] px-4 py-2 text-xs font-semibold text-white hover:bg-[#df6912] transition-colors"
               >
                 {t.catalog.retry}
               </button>
@@ -959,8 +995,8 @@ export const Storefront: React.FC<StorefrontProps> = ({
                           {c.commentText}
                         </p>
                       </div>
-                      <div className="text-[11px] text-[var(--ufb-muted)] pt-1 border-t border-[var(--ufb-border)]">
-                        {new Date(c.createdAt).toLocaleDateString()}
+                      <div className="text-[11px] font-mono-num text-[var(--ufb-muted)] pt-1 border-t border-[var(--ufb-border)]">
+                        {formatUtcDate(c.createdAt)}
                       </div>
                     </article>
                   ))}
@@ -972,7 +1008,7 @@ export const Storefront: React.FC<StorefrontProps> = ({
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-[var(--ufb-border)] bg-[var(--ufb-surface)]">
+      <footer className="relative z-10 border-t border-[var(--ufb-border)] bg-[var(--ufb-surface)] pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 py-10">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="space-y-2.5">
@@ -1027,9 +1063,9 @@ export const Storefront: React.FC<StorefrontProps> = ({
                 {t.footer.socialTitle}
               </h4>
               <div className="flex flex-col space-y-1.5 text-sm">
-                {settings?.tiktokUrl ? (
+                {safeHttpUrl(settings?.tiktokUrl) ? (
                   <a
-                    href={settings.tiktokUrl}
+                    href={safeHttpUrl(settings?.tiktokUrl)!}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 hover:text-[#F47B20] transition-colors"
@@ -1040,9 +1076,9 @@ export const Storefront: React.FC<StorefrontProps> = ({
                 ) : (
                   <span className="text-xs text-[var(--ufb-muted)]">TikTok</span>
                 )}
-                {settings?.facebookUrl ? (
+                {safeHttpUrl(settings?.facebookUrl) ? (
                   <a
-                    href={settings.facebookUrl}
+                    href={safeHttpUrl(settings?.facebookUrl)!}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 hover:text-[#F47B20] transition-colors"
@@ -1079,7 +1115,7 @@ export const Storefront: React.FC<StorefrontProps> = ({
           </div>
 
           <div className="mt-8 border-t border-[var(--ufb-border)] pt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--ufb-muted)]">
-            <span>
+            <span suppressHydrationWarning>
               © {new Date().getFullYear()} {settings?.businessName || 'UrFoodBox'}. {t.footer.rights}
             </span>
             <span>{settings?.slogan || 'Machew devan pot kay ou.'}</span>

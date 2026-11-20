@@ -48,15 +48,23 @@ export async function PUT(
     if (typeof descriptionFr === 'string') updateFields.descriptionFr = descriptionFr;
     if (typeof descriptionHt === 'string') updateFields.descriptionHt = descriptionHt;
     if (priceUsd !== undefined) {
-      updateFields.priceUsd = Math.max(0, Number(priceUsd) || 0).toFixed(2);
+      const usdNum = Number(priceUsd);
+      if (!Number.isFinite(usdNum) || usdNum < 0) {
+        return NextResponse.json({ error: 'USD price must be 0 or higher.' }, { status: 400 });
+      }
+      updateFields.priceUsd = usdNum.toFixed(2);
     }
     if (priceHtg !== undefined) {
-      updateFields.priceHtg = Math.max(0, Number(priceHtg) || 0).toFixed(2);
+      const htgNum = Number(priceHtg);
+      if (!Number.isFinite(htgNum) || htgNum < 0) {
+        return NextResponse.json({ error: 'HTG price must be 0 or higher.' }, { status: 400 });
+      }
+      updateFields.priceHtg = htgNum.toFixed(2);
     }
     if (typeof isAvailable === 'boolean') updateFields.isAvailable = isAvailable;
     if (typeof isFeatured === 'boolean') updateFields.isFeatured = isFeatured;
     if (sortOrder !== undefined && Number.isFinite(Number(sortOrder))) {
-      updateFields.sortOrder = Number(sortOrder);
+      updateFields.sortOrder = Math.trunc(Number(sortOrder));
     }
 
     const [updated] = await db

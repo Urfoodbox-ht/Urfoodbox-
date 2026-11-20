@@ -67,6 +67,10 @@ export async function PUT(request: Request) {
       .where(eq(businessSettings.singletonKey, 'default'))
       .returning();
 
+    if (!updated) {
+      return NextResponse.json({ error: 'Business settings record not found.' }, { status: 404 });
+    }
+
     const logoUrl = updated.logoImageId
       ? `/api/images/${updated.logoImageId}`
       : '/assets/aistudio/IMG-20261115-WA0000_6c778049_6c778049.jpg';

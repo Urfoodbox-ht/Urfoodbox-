@@ -43,8 +43,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Product name is required.' }, { status: 400 });
     }
 
-    const usdNum = Math.max(0, Number(priceUsd) || 0);
-    const htgNum = Math.max(0, Number(priceHtg) || 0);
+    const usdNum = Number(priceUsd);
+    const htgNum = Number(priceHtg);
+    if (!Number.isFinite(usdNum) || usdNum < 0) {
+      return NextResponse.json({ error: 'USD price must be 0 or higher.' }, { status: 400 });
+    }
+    if (!Number.isFinite(htgNum) || htgNum < 0) {
+      return NextResponse.json({ error: 'HTG price must be 0 or higher.' }, { status: 400 });
+    }
 
     const [created] = await db
       .insert(products)
@@ -60,7 +66,7 @@ export async function POST(request: Request) {
         priceHtg: htgNum.toFixed(2),
         isAvailable: Boolean(isAvailable),
         isFeatured: Boolean(isFeatured),
-        sortOrder: Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : 10,
+        sortOrder: Number.isFinite(Number(sortOrder)) ? Math.trunc(Number(sortOrder)) : 10,
       })
       .returning();
 

@@ -204,7 +204,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         onClick={handleCloseDrawer}
       />
 
-      <div className="relative z-10 flex h-full w-full max-w-lg flex-col bg-[var(--ufb-card)] text-[var(--ufb-text)] shadow-2xl border-l border-[var(--ufb-border)]">
+      <div className="relative z-10 flex h-dvh w-full max-w-lg flex-col bg-[var(--ufb-card)] text-[var(--ufb-text)] shadow-2xl border-l border-[var(--ufb-border)]">
         {/* Header */}
         <div className="flex items-center justify-between gap-4 border-b border-[var(--ufb-border)] px-6 py-4">
           <div className="flex items-center gap-2.5">
@@ -222,7 +222,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto px-5 sm:px-6 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
           {confirmation ? (
             <div className="space-y-5 py-4">
               <div className="rounded-xl border border-[#238447]/30 bg-[#238447]/8 p-5">

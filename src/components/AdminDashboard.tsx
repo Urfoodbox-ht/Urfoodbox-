@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { signInWithPopup } from 'firebase/auth';
+import React, { useEffect, useRef, useState } from 'react';
+import { getRedirectResult, signInWithPopup, signInWithRedirect } from 'firebase/auth';
 import {
   ArrowLeft,
   Check,
@@ -53,6 +53,43 @@ const ORDER_STATUSES: OrderStatus[] = [
   'Delivered',
   'Cancelled',
 ];
+
+const ADMIN_TOKEN_STORAGE_KEY = 'ufb_admin_token';
+const ADMIN_REDIRECT_FLAG_KEY = 'ufb_admin_google_redirect';
+
+function readStoredAdminToken(): string | null {
+  try {
+    return typeof window !== 'undefined' ? sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredAdminToken(token: string | null) {
+  try {
+    if (typeof window === 'undefined') return;
+    if (token) {
+      sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+    } else {
+      sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function buildAdminFetchInit(init: RequestInit = {}): RequestInit {
+  const token = readStoredAdminToken();
+  const headers = new Headers(init.headers);
+  if (token && !headers.has('x-admin-token')) {
+    headers.set('x-admin-token', token);
+  }
+  return {
+    ...init,
+    credentials: 'include',
+    headers,
+  };
+}
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onExitAdmin,
@@ -106,10 +143,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (type: 'ok' | 'err', text: string) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
     setToast({ type, text });
-    setTimeout(() => setToast(null), 4000);
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 4000);
   };
 
   const openNewBoxModal = () => {
@@ -134,11 +178,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const loadOverview = async () => {
     setLoadingData(true);
     try {
-      const { res, data } = await safeFetchJson('/api/admin/overview', {
-        credentials: 'include',
-      });
+      const { res, data } = await safeFetchJson('/api/admin/overview', buildAdminFetchInit());
       if (!res.ok) {
         if (res.status === 401) {
+          writeStoredAdminToken(null);
           setAdminUser(null);
           return;
         }
@@ -162,9 +205,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     (async () => {
       try {
-        const { res, data } = await safeFetchJson('/api/admin/session', {
-          credentials: 'include',
-        });
+        const redirectFlag =
+          typeof window !== 'undefined' && sessionStorage.getItem(ADMIN_REDIRECT_FLAG_KEY) === '1';
+        if (redirectFlag) {
+          sessionStorage.removeItem(ADMIN_REDIRECT_FLAG_KEY);
+          const redirectCred = await getRedirectResult(auth);
+          if (redirectCred?.user) {
+            const idToken = await redirectCred.user.getIdToken();
+            const { res: gRes, data: gData } = await safeFetchJson('/api/admin/login-google', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${idToken}` },
+              credentials: 'include',
+            });
+            if (gRes.ok && gData.admin) {
+              if (gData.sessionToken) writeStoredAdminToken(gData.sessionToken);
+              setAdminUser(gData.admin);
+              await loadOverview();
+              return;
+            }
+            if (!gRes.ok) {
+              setLoginError(gData.error || 'Unauthorized Google account');
+            }
+          }
+        }
+
+        const { res, data } = await safeFetchJson('/api/admin/session', buildAdminFetchInit());
         if (res.ok && data.admin) {
           setAdminUser(data.admin);
           await loadOverview();
@@ -192,6 +257,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         }),
       });
       if (!res.ok) throw new Error(data.error || 'Login failed');
+      if (data.sessionToken) writeStoredAdminToken(data.sessionToken);
       setAdminUser(data.admin);
       setLoginPassword('');
       await loadOverview();
@@ -214,29 +280,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         credentials: 'include',
       });
       if (!res.ok) throw new Error(data.error || 'Unauthorized Google account');
+      if (data.sessionToken) writeStoredAdminToken(data.sessionToken);
       setAdminUser(data.admin);
       await loadOverview();
     } catch (err: any) {
-      setLoginError(err.message || 'Google sign-in failed');
+      const code = err?.code || '';
+      const isTopLevel = typeof window !== 'undefined' && window.self === window.top;
+      if (
+        isTopLevel &&
+        (code === 'auth/popup-blocked' ||
+          code === 'auth/operation-not-supported-in-this-environment' ||
+          code === 'auth/web-storage-unsupported')
+      ) {
+        try {
+          sessionStorage.setItem(ADMIN_REDIRECT_FLAG_KEY, '1');
+        } catch {
+          // ignore
+        }
+        await signInWithRedirect(auth, googleAuthProvider);
+        return;
+      }
+      if (code !== 'auth/popup-closed-by-user') {
+        setLoginError(err.message || 'Google sign-in failed');
+      }
     } finally {
       setLoginLoading(false);
     }
   };
 
   const handleLogout = async () => {
-    await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' });
+    writeStoredAdminToken(null);
+    try {
+      await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' });
+    } catch {
+      // Ignore transient logout network errors
+    }
     setAdminUser(null);
     setOrders([]);
   };
 
   const handleOrderStatusChange = async (orderId: number, status: OrderStatus) => {
     try {
-      const { res, data } = await safeFetchJson(`/api/admin/orders/${orderId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status }),
-      });
+      const { res, data } = await safeFetchJson(
+        `/api/admin/orders/${orderId}/status`,
+        buildAdminFetchInit({
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        })
+      );
       if (!res.ok) throw new Error(data.error || 'Failed to update status');
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
       showToast('ok', `Order status updated to ${status}`);
@@ -247,12 +339,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSaveExchangeRate = async () => {
     try {
-      const { res, data } = await safeFetchJson('/api/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ exchangeRateHtgPerUsd: exchangeRateInput }),
-      });
+      const { res, data } = await safeFetchJson(
+        '/api/admin/settings',
+        buildAdminFetchInit({
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ exchangeRateHtgPerUsd: exchangeRateInput }),
+        })
+      );
       if (!res.ok) throw new Error(data.error || 'Failed to update exchange rate');
       setSettings(data.settings);
       setSettingsForm(data.settings);
@@ -265,12 +359,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleToggleProductAvailability = async (product: Product) => {
     try {
-      const { res, data } = await safeFetchJson(`/api/admin/products/${product.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ isAvailable: !product.isAvailable }),
-      });
+      const { res, data } = await safeFetchJson(
+        `/api/admin/products/${product.id}`,
+        buildAdminFetchInit({
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isAvailable: !product.isAvailable }),
+        })
+      );
       if (!res.ok) throw new Error(data.error || 'Failed to update product');
       setProducts((prev) => prev.map((p) => (p.id === product.id ? data.product : p)));
       await onStorefrontUpdated();
@@ -290,12 +386,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         : `/api/admin/products/${editingProduct.id}`;
       const method = isNewProduct ? 'POST' : 'PUT';
 
-      const { res, data } = await safeFetchJson(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(editingProduct),
-      });
+      const { res, data } = await safeFetchJson(
+        url,
+        buildAdminFetchInit({
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editingProduct),
+        })
+      );
       if (!res.ok) throw new Error(data.error || 'Failed to save product');
 
       if (pendingProductImage && data.product?.id) {
@@ -303,11 +401,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         formData.append('image', pendingProductImage);
         const { res: imgRes, data: imgData } = await safeFetchJson(
           `/api/admin/products/${data.product.id}/image`,
-          {
+          buildAdminFetchInit({
             method: 'POST',
-            credentials: 'include',
             body: formData,
-          }
+          })
         );
         if (!imgRes.ok) {
           showToast('err', imgData.error || 'Box saved, but photo upload failed.');
@@ -328,10 +425,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleDeleteProduct = async (product: Product) => {
     try {
-      const { res, data } = await safeFetchJson(`/api/admin/products/${product.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
+      const { res, data } = await safeFetchJson(
+        `/api/admin/products/${product.id}`,
+        buildAdminFetchInit({
+          method: 'DELETE',
+        })
+      );
       if (!res.ok) {
         throw new Error(data.error || 'Failed to delete product');
       }
@@ -345,12 +444,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleToggleCommentVisibility = async (comment: CustomerComment) => {
     try {
-      const { res, data } = await safeFetchJson(`/api/admin/comments/${comment.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ isVisible: !comment.isVisible }),
-      });
+      const { res, data } = await safeFetchJson(
+        `/api/admin/comments/${comment.id}`,
+        buildAdminFetchInit({
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isVisible: !comment.isVisible }),
+        })
+      );
       if (!res.ok) throw new Error(data.error || 'Failed to update comment');
       setComments((prev) => prev.map((c) => (c.id === comment.id ? data.comment : c)));
       await onStorefrontUpdated();
@@ -362,10 +463,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleDeleteComment = async (commentId: number) => {
     try {
-      const { res, data } = await safeFetchJson(`/api/admin/comments/${commentId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
+      const { res, data } = await safeFetchJson(
+        `/api/admin/comments/${commentId}`,
+        buildAdminFetchInit({
+          method: 'DELETE',
+        })
+      );
       if (!res.ok) {
         throw new Error(data.error || 'Failed to delete comment');
       }
@@ -382,11 +485,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const formData = new FormData();
       formData.append('image', file);
-      const { res, data } = await safeFetchJson(`/api/admin/products/${productId}/image`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
+      const { res, data } = await safeFetchJson(
+        `/api/admin/products/${productId}/image`,
+        buildAdminFetchInit({
+          method: 'POST',
+          body: formData,
+        })
+      );
       if (!res.ok) throw new Error(data.error || 'Upload failed');
       setProducts((prev) =>
         prev.map((p) => (p.id === productId ? { ...p, imageUrl: `${data.imageUrl}?v=${Date.now()}` } : p))
@@ -402,11 +507,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleRemoveProductImage = async (productId: number) => {
     try {
-      const res = await fetch(`/api/admin/products/${productId}/image`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Could not remove image');
+      const { res, data } = await safeFetchJson(
+        `/api/admin/products/${productId}/image`,
+        buildAdminFetchInit({
+          method: 'DELETE',
+        })
+      );
+      if (!res.ok) throw new Error(data.error || 'Could not remove image');
       setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, imageUrl: null } : p)));
       await onStorefrontUpdated();
       showToast('ok', 'Product photograph removed.');
@@ -420,11 +527,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const formData = new FormData();
       formData.append('image', file);
-      const { res, data } = await safeFetchJson('/api/admin/logo', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
+      const { res, data } = await safeFetchJson(
+        '/api/admin/logo',
+        buildAdminFetchInit({
+          method: 'POST',
+          body: formData,
+        })
+      );
       if (!res.ok) throw new Error(data.error || 'Logo upload failed');
       await loadOverview();
       await onStorefrontUpdated();
@@ -438,11 +547,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleResetLogo = async () => {
     try {
-      const res = await fetch('/api/admin/logo', {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Failed to reset logo');
+      const { res, data } = await safeFetchJson(
+        '/api/admin/logo',
+        buildAdminFetchInit({
+          method: 'DELETE',
+        })
+      );
+      if (!res.ok) throw new Error(data.error || 'Failed to reset logo');
       await loadOverview();
       await onStorefrontUpdated();
       showToast('ok', 'Restored official UrFoodBox logo.');
@@ -455,12 +566,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.preventDefault();
     setSavingSettings(true);
     try {
-      const { res, data } = await safeFetchJson('/api/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(settingsForm),
-      });
+      const { res, data } = await safeFetchJson(
+        '/api/admin/settings',
+        buildAdminFetchInit({
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(settingsForm),
+        })
+      );
       if (!res.ok) throw new Error(data.error || 'Failed to save settings');
       setSettings(data.settings);
       setSettingsForm(data.settings);
@@ -481,12 +594,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
     setSavingPassword(true);
     try {
-      const { res, data } = await safeFetchJson('/api/admin/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
+      const { res, data } = await safeFetchJson(
+        '/api/admin/change-password',
+        buildAdminFetchInit({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentPassword, newPassword }),
+        })
+      );
       if (!res.ok) throw new Error(data.error || 'Failed to update password');
       setCurrentPassword('');
       setNewPassword('');
@@ -1436,7 +1551,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           />
           <form
             onSubmit={handleSaveProduct}
-            className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] p-6 space-y-5 shadow-2xl"
+            className="relative z-10 max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] p-5 sm:p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] space-y-5 shadow-2xl"
           >
             <div className="flex items-center justify-between border-b border-[var(--ufb-border)] pb-3">
               <h3 className="font-display text-lg font-bold">

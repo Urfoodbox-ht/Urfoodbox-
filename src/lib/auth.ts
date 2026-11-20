@@ -2,7 +2,8 @@ import crypto from 'node:crypto';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import { eq } from 'drizzle-orm';
 import { adminAuth } from './firebase-admin.ts';
-import { db, hasConfiguredDatabase } from '../db/index.ts';
+import { db, hasConfiguredDatabase, resolvePostgresUrl } from '../db/index.ts';
+import { ensureSeeded } from '../db/queries.ts';
 import { administratorAccounts } from '../db/schema.ts';
 
 export const ADMIN_COOKIE_NAME = 'ufb_admin_session';
@@ -12,7 +13,7 @@ const getSessionSecret = (): string => {
     return process.env.ADMIN_SESSION_SECRET;
   }
   const seed =
-    process.env.DATABASE_URL ||
+    resolvePostgresUrl() ||
     process.env.SQL_PASSWORD ||
     process.env.APP_URL ||
     'urfoodbox-local-dev-signing-key';
@@ -100,13 +101,32 @@ export function isHttpsRequest(request: Request): boolean {
   return request.url.startsWith('https://') || process.env.VERCEL === '1';
 }
 
+export function isCrossSiteRequest(request: Request): boolean {
+  const fetchSite = request.headers.get('sec-fetch-site');
+  const fetchDest = request.headers.get('sec-fetch-dest');
+  if (fetchDest === 'iframe' || fetchSite === 'cross-site') {
+    return true;
+  }
+  const origin = request.headers.get('origin');
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
+  if (origin && host) {
+    try {
+      return new URL(origin).host !== host;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
 export function buildAdminCookieConfig(request: Request, token: string) {
   const isSecure = isHttpsRequest(request);
+  const useSameSiteNone = isSecure && isCrossSiteRequest(request);
   return {
     name: ADMIN_COOKIE_NAME,
     value: token,
     httpOnly: true,
-    sameSite: (isSecure ? 'none' : 'lax') as 'none' | 'lax',
+    sameSite: (useSameSiteNone ? 'none' : 'lax') as 'none' | 'lax',
     secure: isSecure,
     path: '/',
     maxAge: 60 * 60 * 24 * 7,
@@ -136,11 +156,13 @@ export async function getAuthenticatedAdmin(
   }
 
   try {
+    await ensureSeeded();
     const cookies = parseCookies(request.headers.get('cookie'));
-    const cookieToken = cookies[ADMIN_COOKIE_NAME];
+    const headerToken = request.headers.get('x-admin-token')?.trim();
+    const sessionToken = cookies[ADMIN_COOKIE_NAME] || headerToken;
 
-    if (cookieToken) {
-      const session = verifyAdminSessionToken(cookieToken);
+    if (sessionToken) {
+      const session = verifyAdminSessionToken(sessionToken);
       if (session) {
         const [admin] = await db
           .select({

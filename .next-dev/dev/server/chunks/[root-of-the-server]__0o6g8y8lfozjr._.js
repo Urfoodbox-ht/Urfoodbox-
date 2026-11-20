@@ -89,6 +89,10 @@ async function GET() {
         ok: true,
         service: 'urfoodbox',
         databaseConfigured: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["hasConfiguredDatabase"])()
+    }, {
+        headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate'
+        }
     });
 }
 __turbopack_async_result__();
@@ -98,6 +102,8 @@ __turbopack_async_result__();
 
 return __turbopack_context__.a(async (__turbopack_handle_async_dependencies__, __turbopack_async_result__) => { try {
 __turbopack_context__.s([
+    "cleanEnvConnectionValue",
+    ()=>cleanEnvConnectionValue,
     "createPool",
     ()=>createPool,
     "db",
@@ -122,10 +128,23 @@ var __turbopack_async_dependencies__ = __turbopack_handle_async_dependencies__([
 ;
 ;
 ;
+function cleanEnvConnectionValue(value) {
+    if (!value) return null;
+    let cleaned = value.trim();
+    // Handle accidental copy-paste of Neon CLI snippet like: psql 'postgresql://...'
+    if (/^psql\s+/i.test(cleaned)) {
+        cleaned = cleaned.replace(/^psql\s+/i, '').trim();
+    }
+    // Strip wrapping single or double quotes if pasted with quotes
+    if (cleaned.startsWith('"') && cleaned.endsWith('"') || cleaned.startsWith("'") && cleaned.endsWith("'")) {
+        cleaned = cleaned.slice(1, -1).trim();
+    }
+    return cleaned || null;
+}
 const isValidPostgresUrl = (value)=>{
-    if (!value) return false;
-    const trimmed = value.trim();
-    return trimmed.startsWith('postgres://') || trimmed.startsWith('postgresql://');
+    const cleaned = cleanEnvConnectionValue(value);
+    if (!cleaned) return false;
+    return cleaned.startsWith('postgres://') || cleaned.startsWith('postgresql://');
 };
 function resolvePostgresUrl() {
     const candidates = [
@@ -137,8 +156,9 @@ function resolvePostgresUrl() {
         process.env.SUPABASE_DB_URL
     ];
     for (const candidate of candidates){
-        if (isValidPostgresUrl(candidate)) {
-            return candidate.trim();
+        const cleaned = cleanEnvConnectionValue(candidate);
+        if (cleaned && (cleaned.startsWith('postgres://') || cleaned.startsWith('postgresql://'))) {
+            return cleaned;
         }
     }
     return null;
@@ -147,16 +167,43 @@ function hasConfiguredDatabase() {
     if (resolvePostgresUrl()) return true;
     return Boolean(process.env.SQL_HOST && process.env.SQL_USER && process.env.SQL_DB_NAME);
 }
+function normalizeConnectionForPool(rawUrl) {
+    let sslDisableRequested = process.env.DATABASE_SSL === 'false';
+    let sanitizedUrl = rawUrl;
+    try {
+        const parsed = new URL(rawUrl);
+        const sslMode = parsed.searchParams.get('sslmode')?.toLowerCase();
+        const isLocalHost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1';
+        if (sslMode === 'disable' || isLocalHost) {
+            sslDisableRequested = true;
+        } else if (sslMode && sslMode !== 'verify-full') {
+            // pg@8 treats sslmode=require/prefer/verify-ca as verify-full and overrides the ssl option.
+            // Remove sslmode/channel_binding so our explicit SSL config governs TLS cleanly on Vercel & poolers.
+            parsed.searchParams.delete('sslmode');
+            parsed.searchParams.delete('channel_binding');
+            sanitizedUrl = parsed.toString();
+        } else if (parsed.searchParams.has('channel_binding')) {
+            parsed.searchParams.delete('channel_binding');
+            sanitizedUrl = parsed.toString();
+        }
+    } catch  {
+    // Keep rawUrl if URL constructor cannot parse custom socket/host syntax
+    }
+    return {
+        connectionString: sanitizedUrl,
+        ssl: sslDisableRequested ? false : {
+            rejectUnauthorized: false
+        }
+    };
+}
 const createPool = ()=>{
     if (!/*TURBOPACK member replacement*/ __turbopack_context__.g._postgresPool) {
         const databaseUrl = resolvePostgresUrl();
         if (databaseUrl) {
-            const useSsl = process.env.DATABASE_SSL !== 'false' && !databaseUrl.includes('localhost') && !databaseUrl.includes('127.0.0.1');
+            const { connectionString, ssl } = normalizeConnectionForPool(databaseUrl);
             /*TURBOPACK member replacement*/ __turbopack_context__.g._postgresPool = new __TURBOPACK__imported__module__$5b$externals$5d2f$pg__$5b$external$5d$__$28$pg$2c$__esm_import$2c$__$5b$project$5d2f$node_modules$2f$pg$29$__["Pool"]({
-                connectionString: databaseUrl,
-                ssl: useSsl ? {
-                    rejectUnauthorized: false
-                } : false,
+                connectionString,
+                ssl,
                 max: 5,
                 idleTimeoutMillis: 20000,
                 connectionTimeoutMillis: 15000
