@@ -116,7 +116,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     bootstrapOpen: boolean;
     bootstrapConfigured: boolean;
     requiresBootstrapToken: boolean;
+    hasAdminEmailAllowlist?: boolean;
   } | null>(null);
+  const [checkingBootstrap, setCheckingBootstrap] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -217,25 +219,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const refreshBootstrapStatus = async () => {
+    setCheckingBootstrap(true);
+    try {
+      const { res: bRes, data: bData } = await safeFetchJson('/api/admin/bootstrap', {
+        cache: 'no-store',
+        credentials: 'include',
+      });
+      if (bRes.ok && typeof bData?.bootstrapOpen === 'boolean') {
+        const nextStatus = {
+          bootstrapOpen: Boolean(bData.bootstrapOpen),
+          bootstrapConfigured: Boolean(bData.bootstrapConfigured),
+          requiresBootstrapToken: Boolean(bData.requiresBootstrapToken),
+          hasAdminEmailAllowlist: Boolean(bData.hasAdminEmailAllowlist),
+        };
+        setBootstrapStatus(nextStatus);
+        return nextStatus;
+      }
+    } catch {
+      // Non-fatal bootstrap status check failure
+    } finally {
+      setCheckingBootstrap(false);
+    }
+    return null;
+  };
+
   useEffect(() => {
     (async () => {
       try {
         let resolvedBootstrapOpen = false;
         let resolvedRequiresToken = false;
 
-        try {
-          const { res: bRes, data: bData } = await safeFetchJson('/api/admin/bootstrap');
-          if (bRes.ok && typeof bData?.bootstrapOpen === 'boolean') {
-            resolvedBootstrapOpen = bData.bootstrapOpen;
-            resolvedRequiresToken = Boolean(bData.requiresBootstrapToken);
-            setBootstrapStatus({
-              bootstrapOpen: bData.bootstrapOpen,
-              bootstrapConfigured: Boolean(bData.bootstrapConfigured),
-              requiresBootstrapToken: Boolean(bData.requiresBootstrapToken),
-            });
-          }
-        } catch {
-          // Non-fatal bootstrap status check failure
+        const latestBootstrap = await refreshBootstrapStatus();
+        if (latestBootstrap) {
+          resolvedBootstrapOpen = latestBootstrap.bootstrapOpen;
+          resolvedRequiresToken = latestBootstrap.requiresBootstrapToken;
         }
 
         const redirectFlag =
@@ -304,9 +322,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setLoginError(null);
     setLoginLoading(true);
     try {
+      let currentBootstrap = bootstrapStatus;
+      if (currentBootstrap?.bootstrapOpen && !currentBootstrap.bootstrapConfigured) {
+        currentBootstrap = (await refreshBootstrapStatus()) ?? currentBootstrap;
+      }
+      if (currentBootstrap?.bootstrapOpen && !currentBootstrap.bootstrapConfigured) {
+        throw new Error(
+          'Server authorization is not active yet. Set ADMIN_EMAIL and/or ADMIN_BOOTSTRAP_TOKEN in Vercel Environment Variables (Production), then redeploy.'
+        );
+      }
+
+      const isBootstrap = Boolean(currentBootstrap?.bootstrapOpen);
+      if (isBootstrap && currentBootstrap?.requiresBootstrapToken && !bootstrapToken.trim()) {
+        throw new Error('Enter the Bootstrap Authorization Token (ADMIN_BOOTSTRAP_TOKEN).');
+      }
+
       const cred = await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
       const idToken = await cred.user.getIdToken();
-      const isBootstrap = Boolean(bootstrapStatus?.bootstrapOpen);
       const endpoint = isBootstrap ? '/api/admin/bootstrap' : '/api/admin/login';
       const { res, data } = await safeFetchJson(endpoint, {
         method: 'POST',
@@ -354,9 +386,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setLoginError(null);
     setLoginLoading(true);
     try {
+      let currentBootstrap = bootstrapStatus;
+      if (currentBootstrap?.bootstrapOpen && !currentBootstrap.bootstrapConfigured) {
+        currentBootstrap = (await refreshBootstrapStatus()) ?? currentBootstrap;
+      }
+      if (currentBootstrap?.bootstrapOpen && !currentBootstrap.bootstrapConfigured) {
+        throw new Error(
+          'Server authorization is not active yet. Set ADMIN_EMAIL and/or ADMIN_BOOTSTRAP_TOKEN in Vercel Environment Variables (Production), then redeploy.'
+        );
+      }
+
+      const isBootstrap = Boolean(currentBootstrap?.bootstrapOpen);
+      if (isBootstrap && currentBootstrap?.requiresBootstrapToken && !bootstrapToken.trim()) {
+        throw new Error(
+          'Enter the Bootstrap Authorization Token (ADMIN_BOOTSTRAP_TOKEN) above before signing in with Google.'
+        );
+      }
+
       const cred = await signInWithPopup(auth, googleAuthProvider);
       const idToken = await cred.user.getIdToken();
-      const isBootstrap = Boolean(bootstrapStatus?.bootstrapOpen);
       const endpoint = isBootstrap ? '/api/admin/bootstrap' : '/api/admin/login';
       const { res, data } = await safeFetchJson(endpoint, {
         method: 'POST',
@@ -384,6 +432,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           code === 'auth/operation-not-supported-in-this-environment' ||
           code === 'auth/web-storage-unsupported')
       ) {
+        if (bootstrapStatus?.bootstrapOpen && bootstrapStatus?.requiresBootstrapToken) {
+          setLoginError(
+            'Your browser blocked the Google sign-in popup. Allow popups for this site or use Email/Password above to submit your Bootstrap Authorization Token.'
+          );
+          return;
+        }
         try {
           sessionStorage.setItem(ADMIN_REDIRECT_FLAG_KEY, '1');
         } catch {
@@ -772,13 +826,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           {bootstrapStatus?.bootstrapOpen && !bootstrapStatus.bootstrapConfigured && (
-            <div className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+            <div className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-xs text-amber-800 dark:text-amber-300 space-y-2">
               <div className="font-semibold">Server Authorization Required Before Setup</div>
               <p>
-                Configure <code className="font-mono">ADMIN_EMAIL</code> and/or{' '}
-                <code className="font-mono">ADMIN_BOOTSTRAP_TOKEN</code> in your Vercel Environment
-                Variables and redeploy before claiming the initial owner account.
+                This deployment is not seeing{' '}
+                <code className="font-mono font-semibold">ADMIN_EMAIL</code> or{' '}
+                <code className="font-mono font-semibold">ADMIN_BOOTSTRAP_TOKEN</code> yet. Add
+                either (or both) in Vercel Environment Variables for Production and{' '}
+                <span className="font-semibold">redeploy</span> so the server loads them.
               </p>
+              <div className="flex flex-wrap items-center gap-3 pt-0.5 text-[11px] font-mono">
+                <span>ADMIN_EMAIL: {bootstrapStatus.hasAdminEmailAllowlist ? 'Set' : 'Not detected'}</span>
+                <span>
+                  ADMIN_BOOTSTRAP_TOKEN: {bootstrapStatus.requiresBootstrapToken ? 'Set' : 'Not detected'}
+                </span>
+              </div>
+              <button
+                type="button"
+                disabled={checkingBootstrap}
+                onClick={() => {
+                  setLoginError(null);
+                  void refreshBootstrapStatus();
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/15 px-2.5 py-1 text-[11px] font-semibold hover:bg-amber-500/25 disabled:opacity-60 transition-colors"
+              >
+                <RefreshCw className={`h-3 w-3 ${checkingBootstrap ? 'animate-spin' : ''}`} />
+                <span>{checkingBootstrap ? 'Checking server...' : 'Re-check Server Config'}</span>
+              </button>
             </div>
           )}
 
@@ -845,7 +919,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <button
               type="submit"
-              disabled={loginLoading || (Boolean(bootstrapStatus?.bootstrapOpen) && !bootstrapStatus?.bootstrapConfigured)}
+              disabled={loginLoading}
               className="w-full rounded-lg bg-[#F47B20] px-5 py-3 text-sm font-semibold text-white hover:bg-[#df6912] disabled:opacity-60 transition-colors"
             >
               {loginLoading
@@ -865,7 +939,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <button
             type="button"
-            disabled={loginLoading || (Boolean(bootstrapStatus?.bootstrapOpen) && !bootstrapStatus?.bootstrapConfigured)}
+            disabled={loginLoading}
             onClick={handleGoogleAdminLogin}
             className="w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] px-5 py-2.5 text-sm font-semibold hover:border-[#238447] hover:text-[#238447] disabled:opacity-60 transition-colors"
           >

@@ -1399,6 +1399,30 @@
     }
   }
 
+  .border-amber-500 {
+    border-color: var(--color-amber-500);
+  }
+
+  .border-amber-500\/35 {
+    border-color: #f99c0059;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .border-amber-500\/35 {
+      border-color: color-mix(in oklab, var(--color-amber-500) 35%, transparent);
+    }
+  }
+
+  .border-amber-500\/40 {
+    border-color: #f99c0066;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .border-amber-500\/40 {
+      border-color: color-mix(in oklab, var(--color-amber-500) 40%, transparent);
+    }
+  }
+
   .border-red-500 {
     border-color: var(--color-red-500);
   }
@@ -1511,6 +1535,30 @@
     }
   }
 
+  .bg-amber-500 {
+    background-color: var(--color-amber-500);
+  }
+
+  .bg-amber-500\/10 {
+    background-color: #f99c001a;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-amber-500\/10 {
+      background-color: color-mix(in oklab, var(--color-amber-500) 10%, transparent);
+    }
+  }
+
+  .bg-amber-500\/15 {
+    background-color: #f99c0026;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-amber-500\/15 {
+      background-color: color-mix(in oklab, var(--color-amber-500) 15%, transparent);
+    }
+  }
+
   .bg-black {
     background-color: var(--color-black);
   }
@@ -1571,6 +1619,10 @@
 
   .object-cover {
     object-fit: cover;
+  }
+
+  .\!p-7 {
+    padding: calc(var(--spacing) * 7) !important;
   }
 
   .p-0 {
@@ -1801,6 +1853,10 @@
     text-align: right;
   }
 
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
   .text-2xl {
     font-size: var(--text-2xl);
     line-height: var(--tw-leading, var(--text-2xl--line-height));
@@ -1910,6 +1966,10 @@
 
   .text-\[var\(--ufb-text\)\] {
     color: var(--ufb-text);
+  }
+
+  .text-amber-800 {
+    color: var(--color-amber-800);
   }
 
   .text-red-600 {
@@ -2109,6 +2169,16 @@
       background-color: var(--ufb-surface);
     }
 
+    .hover\:bg-amber-500\/25:hover {
+      background-color: #f99c0040;
+    }
+
+    @supports (color: color-mix(in lab, red, red)) {
+      .hover\:bg-amber-500\/25:hover {
+        background-color: color-mix(in oklab, var(--color-amber-500) 25%, transparent);
+      }
+    }
+
     .hover\:text-\[\#238447\]:hover {
       color: #238447;
     }
@@ -2306,6 +2376,10 @@
 
   .dark\:text-\[\#171717\]:where(.dark, .dark *) {
     color: #171717;
+  }
+
+  .dark\:text-amber-300:where(.dark, .dark *) {
+    color: var(--color-amber-300);
   }
 
   .dark\:text-red-400:where(.dark, .dark *) {

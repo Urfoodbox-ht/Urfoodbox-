@@ -29,6 +29,7 @@ export async function GET() {
       bootstrapOpen,
       bootstrapConfigured: configStatus.bootstrapConfigured,
       requiresBootstrapToken: configStatus.requiresBootstrapToken,
+      hasAdminEmailAllowlist: configStatus.hasAdminEmailAllowlist,
     });
   } catch (error) {
     console.error('Admin bootstrap status error:', error);
