@@ -22,6 +22,7 @@
     "firebase-admin": "^14.5.1",
     "lucide-react": "^0.546.0",
     "next": "^16.4.6",
+    "node-domexception": "file:./vendor/node-domexception",
     "pg": "^8.23.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1"
@@ -36,5 +37,14 @@
     "drizzle-kit": "^0.31.11",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0",
+    "node-domexception": "$node-domexception"
+  },
+  "allowScripts": {
+    "esbuild": true,
+    "@firebase/util": false,
+    "protobufjs": false
   }
 }

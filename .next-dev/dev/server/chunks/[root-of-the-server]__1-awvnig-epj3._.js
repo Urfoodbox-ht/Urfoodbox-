@@ -22,8 +22,8 @@ __turbopack_context__.v((parentImport) => {
 __turbopack_context__.v((parentImport) => {
     return Promise.all([
   "server/chunks/node_modules_node-fetch_src_utils_multipart-parser_0-iabbdou5ilq.js",
-  "server/chunks/node_modules_0l3ukh1t3r790._.js",
-  "server/chunks/[externals]__0ylv_bj8esufh._.js"
+  "server/chunks/node_modules_1ho1niwn6x1wg._.js",
+  "server/chunks/[externals]__1hwhfjm5ambv-._.js"
 ].map((chunk) => __turbopack_context__.l(chunk))).then(() => {
         return parentImport("[project]/node_modules/node-fetch/src/index.js [app-route] (ecmascript)");
     });
