@@ -925,6 +925,10 @@
     max-height: 90dvh;
   }
 
+  .max-h-\[90vh\] {
+    max-height: 90vh;
+  }
+
   .max-h-\[300px\] {
     max-height: 300px;
   }
@@ -1619,10 +1623,6 @@
 
   .object-cover {
     object-fit: cover;
-  }
-
-  .\!p-7 {
-    padding: calc(var(--spacing) * 7) !important;
   }
 
   .p-0 {

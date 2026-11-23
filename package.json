@@ -43,8 +43,9 @@
     "node-domexception": "$node-domexception"
   },
   "allowScripts": {
-    "esbuild": true,
-    "@firebase/util": false,
-    "protobufjs": false
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "@firebase/util@1.15.3": false,
+    "protobufjs@7.6.6": false
   }
 }

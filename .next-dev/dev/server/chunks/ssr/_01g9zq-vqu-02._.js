@@ -11,14 +11,39 @@ __turbopack_context__.s([
     "default",
     ()=>RootLayout,
     "metadata",
-    ()=>metadata
+    ()=>metadata,
+    "viewport",
+    ()=>viewport
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$rsc$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/rsc/react-jsx-dev-runtime.js [app-rsc] (ecmascript)");
 ;
 ;
+const viewport = {
+    width: 'device-width',
+    initialScale: 1,
+    viewportFit: 'cover',
+    themeColor: [
+        {
+            media: '(prefers-color-scheme: light)',
+            color: '#F47B20'
+        },
+        {
+            media: '(prefers-color-scheme: dark)',
+            color: '#171717'
+        }
+    ]
+};
 const metadata = {
     title: 'UrFoodBox — Machew devan pot kay ou.',
     description: 'Machew devan pot kay ou. Order curated grocery food boxes online in USD or HTG and get doorstep delivery.',
+    appleWebApp: {
+        capable: true,
+        statusBarStyle: 'default',
+        title: 'UrFoodBox'
+    },
+    formatDetection: {
+        telephone: false
+    },
     openGraph: {
         title: 'UrFoodBox — Machew devan pot kay ou.',
         description: 'Machew devan pot kay ou. Order curated grocery food boxes online in USD or HTG and get doorstep delivery.',
@@ -28,7 +53,8 @@ const metadata = {
         card: 'summary_large_image'
     },
     icons: {
-        icon: '/assets/aistudio/IMG-20261115-WA0000_6c778049_6c778049.jpg'
+        icon: '/assets/aistudio/IMG-20261115-WA0000_6c778049_6c778049.jpg',
+        apple: '/assets/aistudio/IMG-20261115-WA0000_6c778049_6c778049.jpg'
     }
 };
 function RootLayout({ children }) {
@@ -43,7 +69,7 @@ function RootLayout({ children }) {
                         href: "https://fonts.googleapis.com"
                     }, void 0, false, {
                         fileName: "[project]/src/app/layout.tsx",
-                        lineNumber: 30,
+                        lineNumber: 49,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$rsc$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["jsxDEV"])("link", {
@@ -52,7 +78,7 @@ function RootLayout({ children }) {
                         crossOrigin: "anonymous"
                     }, void 0, false, {
                         fileName: "[project]/src/app/layout.tsx",
-                        lineNumber: 31,
+                        lineNumber: 50,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$rsc$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["jsxDEV"])("link", {
@@ -60,26 +86,26 @@ function RootLayout({ children }) {
                         rel: "stylesheet"
                     }, void 0, false, {
                         fileName: "[project]/src/app/layout.tsx",
-                        lineNumber: 32,
+                        lineNumber: 51,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/layout.tsx",
-                lineNumber: 29,
+                lineNumber: 48,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$rsc$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["jsxDEV"])("body", {
                 children: children
             }, void 0, false, {
                 fileName: "[project]/src/app/layout.tsx",
-                lineNumber: 37,
+                lineNumber: 56,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/app/layout.tsx",
-        lineNumber: 28,
+        lineNumber: 47,
         columnNumber: 5
     }, this);
 }

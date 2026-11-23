@@ -161,7 +161,7 @@ const CartDrawer = ({ isOpen, onClose, cart, products, lang, currency, onCurrenc
                 columnNumber: 7
             }, ("TURBOPACK compile-time value", void 0)),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "relative z-10 flex h-full w-full max-w-lg flex-col bg-[var(--ufb-card)] text-[var(--ufb-text)] shadow-2xl border-l border-[var(--ufb-border)]",
+                className: "relative z-10 flex h-dvh w-full max-w-lg flex-col bg-[var(--ufb-card)] text-[var(--ufb-text)] shadow-2xl border-l border-[var(--ufb-border)]",
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         className: "flex items-center justify-between gap-4 border-b border-[var(--ufb-border)] px-6 py-4",
@@ -215,7 +215,7 @@ const CartDrawer = ({ isOpen, onClose, cart, products, lang, currency, onCurrenc
                         columnNumber: 9
                     }, ("TURBOPACK compile-time value", void 0)),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "flex-1 overflow-y-auto px-6 py-5",
+                        className: "flex-1 overflow-y-auto px-5 sm:px-6 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
                         children: confirmation ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "space-y-5 py-4",
                             children: [
@@ -1245,6 +1245,14 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
     }, [
         profile
     ]);
+    __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].useEffect(()=>{
+        if (!subProductId && products.length > 0) {
+            setSubProductId(String(products[0].id));
+        }
+    }, [
+        products,
+        subProductId
+    ]);
     if (!isOpen) return null;
     const handleSaveProfile = async (e)=>{
         e.preventDefault();
@@ -1267,9 +1275,15 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
             });
             if (!res.ok) throw new Error(data.error || 'Failed to save profile');
             await onRefreshAccount();
-            setFeedback(t.account.savedSuccess);
+            setFeedback({
+                type: 'ok',
+                text: t.account.savedSuccess
+            });
         } catch (err) {
-            setFeedback(err.message);
+            setFeedback({
+                type: 'err',
+                text: err.message || 'Failed to save profile'
+            });
         } finally{
             setSaving(false);
         }
@@ -1306,26 +1320,40 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
             setNewAddrLabel('');
             setNewAddrText('');
             await onRefreshAccount();
+        } catch (err) {
+            setFeedback({
+                type: 'err',
+                text: err.message || 'Could not save address'
+            });
         } finally{
             setSaving(false);
         }
     };
     const handleRemoveSavedAddress = async (addrId)=>{
         if (!profile) return;
-        const token = await getAuthToken();
-        if (!token) return;
-        const updatedAddresses = (profile.savedAddresses || []).filter((a)=>a.id !== addrId);
-        await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$fetch$2d$json$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["safeFetchJson"])('/api/customer/me', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                savedAddresses: updatedAddresses
-            })
-        });
-        await onRefreshAccount();
+        setFeedback(null);
+        try {
+            const token = await getAuthToken();
+            if (!token) return;
+            const updatedAddresses = (profile.savedAddresses || []).filter((a)=>a.id !== addrId);
+            const { res, data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$fetch$2d$json$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["safeFetchJson"])('/api/customer/me', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    savedAddresses: updatedAddresses
+                })
+            });
+            if (!res.ok) throw new Error(data.error || 'Could not remove address');
+            await onRefreshAccount();
+        } catch (err) {
+            setFeedback({
+                type: 'err',
+                text: err.message || 'Could not remove address'
+            });
+        }
     };
     const handleSaveSubscription = async (e)=>{
         e.preventDefault();
@@ -1351,9 +1379,15 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
             if (!res.ok) throw new Error(data.error || 'Could not save preference');
             setSubNotes('');
             await onRefreshAccount();
-            setFeedback(t.account.subSaved);
+            setFeedback({
+                type: 'ok',
+                text: t.account.subSaved
+            });
         } catch (err) {
-            setFeedback(err.message);
+            setFeedback({
+                type: 'err',
+                text: err.message || 'Could not save preference'
+            });
         } finally{
             setSaving(false);
         }
@@ -1368,11 +1402,11 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                 onClick: onClose
             }, void 0, false, {
                 fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                lineNumber: 198,
+                lineNumber: 212,
                 columnNumber: 7
             }, ("TURBOPACK compile-time value", void 0)),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] text-[var(--ufb-text)] shadow-2xl",
+                className: "relative z-10 flex max-h-[90dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] text-[var(--ufb-text)] shadow-2xl",
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         className: "flex items-center justify-between border-b border-[var(--ufb-border)] px-6 py-4",
@@ -1384,7 +1418,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                         className: "h-5 w-5 text-[#F47B20]"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                        lineNumber: 203,
+                                        lineNumber: 217,
                                         columnNumber: 13
                                     }, ("TURBOPACK compile-time value", void 0)),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
@@ -1392,13 +1426,13 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                         children: t.account.title
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                        lineNumber: 204,
+                                        lineNumber: 218,
                                         columnNumber: 13
                                     }, ("TURBOPACK compile-time value", void 0))
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                lineNumber: 202,
+                                lineNumber: 216,
                                 columnNumber: 11
                             }, ("TURBOPACK compile-time value", void 0)),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1410,22 +1444,22 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                     className: "h-5 w-5"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                    lineNumber: 212,
+                                    lineNumber: 226,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0))
                             }, void 0, false, {
                                 fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                lineNumber: 206,
+                                lineNumber: 220,
                                 columnNumber: 11
                             }, ("TURBOPACK compile-time value", void 0))
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                        lineNumber: 201,
+                        lineNumber: 215,
                         columnNumber: 9
                     }, ("TURBOPACK compile-time value", void 0)),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "flex-1 overflow-y-auto p-6",
+                        className: "flex-1 overflow-y-auto px-5 sm:px-6 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
                         children: !firebaseEmail ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "space-y-5 py-6 text-center max-w-md mx-auto",
                             children: [
@@ -1434,7 +1468,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                     children: t.account.subtitle
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                    lineNumber: 219,
+                                    lineNumber: 233,
                                     columnNumber: 15
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1442,7 +1476,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                     children: t.account.guestReminder
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                    lineNumber: 220,
+                                    lineNumber: 234,
                                     columnNumber: 15
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1454,18 +1488,18 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                         children: signingIn ? t.account.signingIn : t.account.signInGoogle
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                        lineNumber: 229,
+                                        lineNumber: 243,
                                         columnNumber: 17
                                     }, ("TURBOPACK compile-time value", void 0))
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                    lineNumber: 223,
+                                    lineNumber: 237,
                                     columnNumber: 15
                                 }, ("TURBOPACK compile-time value", void 0))
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                            lineNumber: 218,
+                            lineNumber: 232,
                             columnNumber: 13
                         }, ("TURBOPACK compile-time value", void 0)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "space-y-6",
@@ -1480,12 +1514,12 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                 children: firebaseEmail
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                lineNumber: 236,
+                                                lineNumber: 250,
                                                 columnNumber: 19
                                             }, ("TURBOPACK compile-time value", void 0))
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                            lineNumber: 235,
+                                            lineNumber: 249,
                                             columnNumber: 17
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1497,26 +1531,26 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                     className: "h-3.5 w-3.5"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 243,
+                                                    lineNumber: 257,
                                                     columnNumber: 19
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                     children: t.account.signOut
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 244,
+                                                    lineNumber: 258,
                                                     columnNumber: 19
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                            lineNumber: 238,
+                                            lineNumber: 252,
                                             columnNumber: 17
                                         }, ("TURBOPACK compile-time value", void 0))
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                    lineNumber: 234,
+                                    lineNumber: 248,
                                     columnNumber: 15
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1544,20 +1578,20 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                             children: label
                                         }, key, false, {
                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                            lineNumber: 257,
+                                            lineNumber: 271,
                                             columnNumber: 19
                                         }, ("TURBOPACK compile-time value", void 0)))
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                    lineNumber: 249,
+                                    lineNumber: 263,
                                     columnNumber: 15
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 feedback && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "rounded-lg border border-[#238447]/30 bg-[#238447]/10 px-4 py-2.5 text-xs font-medium text-[#238447]",
-                                    children: feedback
+                                    className: `rounded-lg border px-4 py-2.5 text-xs font-medium ${feedback.type === 'ok' ? 'border-[#238447]/30 bg-[#238447]/10 text-[#238447]' : 'border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400'}`,
+                                    children: feedback.text
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                    lineNumber: 276,
+                                    lineNumber: 290,
                                     columnNumber: 17
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 tab === 'profile' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1577,7 +1611,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                     children: t.account.fullName
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                    lineNumber: 286,
+                                                                    lineNumber: 306,
                                                                     columnNumber: 25
                                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -1587,13 +1621,13 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                     className: "w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] px-3.5 py-2.5 text-sm focus:border-[#F47B20] focus:outline-none"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                    lineNumber: 289,
+                                                                    lineNumber: 309,
                                                                     columnNumber: 25
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 285,
+                                                            lineNumber: 305,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1603,7 +1637,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                     children: t.account.phone
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                    lineNumber: 297,
+                                                                    lineNumber: 317,
                                                                     columnNumber: 25
                                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -1613,19 +1647,19 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                     className: "w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] px-3.5 py-2.5 text-sm focus:border-[#F47B20] focus:outline-none"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                    lineNumber: 300,
+                                                                    lineNumber: 320,
                                                                     columnNumber: 25
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 296,
+                                                            lineNumber: 316,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 284,
+                                                    lineNumber: 304,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1635,7 +1669,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             children: t.account.defaultAddress
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 309,
+                                                            lineNumber: 329,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -1645,13 +1679,13 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             className: "w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] px-3.5 py-2.5 text-sm focus:border-[#F47B20] focus:outline-none"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 312,
+                                                            lineNumber: 332,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 308,
+                                                    lineNumber: 328,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1661,13 +1695,13 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                     children: saving ? t.account.saving : t.account.saveProfile
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 319,
+                                                    lineNumber: 339,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                            lineNumber: 283,
+                                            lineNumber: 303,
                                             columnNumber: 19
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1680,20 +1714,20 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             className: "h-4 w-4 text-[#F47B20]"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 330,
+                                                            lineNumber: 350,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                             children: t.account.savedAddressesTitle
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 331,
+                                                            lineNumber: 351,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 329,
+                                                    lineNumber: 349,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 profile?.savedAddresses?.map((addr)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1709,7 +1743,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                        lineNumber: 339,
+                                                                        lineNumber: 359,
                                                                         columnNumber: 27
                                                                     }, ("TURBOPACK compile-time value", void 0)),
                                                                     ' ',
@@ -1718,13 +1752,13 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                         children: addr.address
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                        lineNumber: 340,
+                                                                        lineNumber: 360,
                                                                         columnNumber: 27
                                                                     }, ("TURBOPACK compile-time value", void 0))
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                lineNumber: 338,
+                                                                lineNumber: 358,
                                                                 columnNumber: 25
                                                             }, ("TURBOPACK compile-time value", void 0)),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1734,13 +1768,13 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                 children: t.cart.remove
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                lineNumber: 342,
+                                                                lineNumber: 362,
                                                                 columnNumber: 25
                                                             }, ("TURBOPACK compile-time value", void 0))
                                                         ]
                                                     }, addr.id, true, {
                                                         fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                        lineNumber: 334,
+                                                        lineNumber: 354,
                                                         columnNumber: 23
                                                     }, ("TURBOPACK compile-time value", void 0))),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1754,7 +1788,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             className: "rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] px-3 py-2 text-xs focus:border-[#F47B20] focus:outline-none"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 353,
+                                                            lineNumber: 373,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -1765,13 +1799,13 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             className: "sm:col-span-2 rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] px-3 py-2 text-xs focus:border-[#F47B20] focus:outline-none"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 360,
+                                                            lineNumber: 380,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 352,
+                                                    lineNumber: 372,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1782,19 +1816,19 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                     children: t.account.addAddressBtn
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 368,
+                                                    lineNumber: 388,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                            lineNumber: 328,
+                                            lineNumber: 348,
                                             columnNumber: 19
                                         }, ("TURBOPACK compile-time value", void 0))
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                    lineNumber: 282,
+                                    lineNumber: 302,
                                     columnNumber: 17
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 tab === 'orders' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1804,7 +1838,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                         children: t.account.noOrders
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                        lineNumber: 383,
+                                        lineNumber: 403,
                                         columnNumber: 21
                                     }, ("TURBOPACK compile-time value", void 0)) : orders.map((order)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "rounded-xl border border-[var(--ufb-border)] bg-[var(--ufb-surface)] p-4 space-y-2",
@@ -1817,7 +1851,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             children: order.orderReference
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 393,
+                                                            lineNumber: 413,
                                                             columnNumber: 27
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1825,13 +1859,13 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             children: t.orderStatuses[order.status] || order.status
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 396,
+                                                            lineNumber: 416,
                                                             columnNumber: 27
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 392,
+                                                    lineNumber: 412,
                                                     columnNumber: 25
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1841,7 +1875,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             children: new Date(order.createdAt).toLocaleDateString()
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 401,
+                                                            lineNumber: 421,
                                                             columnNumber: 27
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1849,13 +1883,13 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             children: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$i18n$2f$translations$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["formatMoney"])(order.totalAmount, order.currency)
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 402,
+                                                            lineNumber: 422,
                                                             columnNumber: 27
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 400,
+                                                    lineNumber: 420,
                                                     columnNumber: 25
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 (order.boxPeriod || order.householdSize > 0) && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1867,7 +1901,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 407,
+                                                    lineNumber: 427,
                                                     columnNumber: 27
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1875,18 +1909,18 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                     children: order.items.map((i)=>`${i.productName} × ${i.quantity}`).join(' · ')
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 417,
+                                                    lineNumber: 437,
                                                     columnNumber: 25
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, order.id, true, {
                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                            lineNumber: 388,
+                                            lineNumber: 408,
                                             columnNumber: 23
                                         }, ("TURBOPACK compile-time value", void 0)))
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                    lineNumber: 381,
+                                    lineNumber: 401,
                                     columnNumber: 17
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 tab === 'subscriptions' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1899,7 +1933,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                     className: "h-5 w-5 shrink-0 text-[#F47B20] mt-0.5"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 429,
+                                                    lineNumber: 449,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1910,7 +1944,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             children: t.account.subTitle
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 431,
+                                                            lineNumber: 451,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -1918,19 +1952,19 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             children: t.account.subNotice
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 432,
+                                                            lineNumber: 452,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 430,
+                                                    lineNumber: 450,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                            lineNumber: 428,
+                                            lineNumber: 448,
                                             columnNumber: 19
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         subscriptions.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1947,7 +1981,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                     className: "h-4 w-4 text-[#238447]"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                    lineNumber: 448,
+                                                                    lineNumber: 468,
                                                                     columnNumber: 31
                                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1956,7 +1990,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                             children: sub.frequency === 'weekly' ? t.account.weekly : t.account.monthly
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                            lineNumber: 450,
+                                                                            lineNumber: 470,
                                                                             columnNumber: 33
                                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                                         ' · ',
@@ -1966,13 +2000,13 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                    lineNumber: 449,
+                                                                    lineNumber: 469,
                                                                     columnNumber: 31
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 447,
+                                                            lineNumber: 467,
                                                             columnNumber: 29
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1980,19 +2014,19 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             children: t.account.subStatusWaitlist
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 457,
+                                                            lineNumber: 477,
                                                             columnNumber: 29
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, sub.id, true, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 443,
+                                                    lineNumber: 463,
                                                     columnNumber: 27
                                                 }, ("TURBOPACK compile-time value", void 0));
                                             })
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                            lineNumber: 439,
+                                            lineNumber: 459,
                                             columnNumber: 21
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -2009,7 +2043,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                     children: t.account.subFrequency
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                    lineNumber: 469,
+                                                                    lineNumber: 489,
                                                                     columnNumber: 25
                                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
@@ -2022,7 +2056,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                             children: t.account.weekly
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                            lineNumber: 477,
+                                                                            lineNumber: 497,
                                                                             columnNumber: 27
                                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -2030,19 +2064,19 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                             children: t.account.monthly
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                            lineNumber: 478,
+                                                                            lineNumber: 498,
                                                                             columnNumber: 27
                                                                         }, ("TURBOPACK compile-time value", void 0))
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                    lineNumber: 472,
+                                                                    lineNumber: 492,
                                                                     columnNumber: 25
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 468,
+                                                            lineNumber: 488,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2052,7 +2086,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                     children: t.account.subDay
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                    lineNumber: 482,
+                                                                    lineNumber: 502,
                                                                     columnNumber: 25
                                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
@@ -2070,24 +2104,24 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                             children: d
                                                                         }, d, false, {
                                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                            lineNumber: 491,
+                                                                            lineNumber: 511,
                                                                             columnNumber: 29
                                                                         }, ("TURBOPACK compile-time value", void 0)))
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                    lineNumber: 485,
+                                                                    lineNumber: 505,
                                                                     columnNumber: 25
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 481,
+                                                            lineNumber: 501,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 467,
+                                                    lineNumber: 487,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2097,7 +2131,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             children: t.account.subBox
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 500,
+                                                            lineNumber: 520,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
@@ -2109,18 +2143,18 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                                     children: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$i18n$2f$translations$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getLocalizedProductName"])(p, lang)
                                                                 }, p.id, false, {
                                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                                    lineNumber: 509,
+                                                                    lineNumber: 529,
                                                                     columnNumber: 27
                                                                 }, ("TURBOPACK compile-time value", void 0)))
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 503,
+                                                            lineNumber: 523,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 499,
+                                                    lineNumber: 519,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2130,7 +2164,7 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             children: t.account.subNotes
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 517,
+                                                            lineNumber: 537,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -2140,13 +2174,13 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                             className: "w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] px-3.5 py-2.5 text-sm"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                            lineNumber: 520,
+                                                            lineNumber: 540,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 516,
+                                                    lineNumber: 536,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -2156,42 +2190,42 @@ const CustomerAccountModal = ({ isOpen, onClose, lang, t, firebaseEmail, profile
                                                     children: subscriptionsEnabled ? t.account.subSaveBtn : t.account.subSaveBtn
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                                    lineNumber: 528,
+                                                    lineNumber: 548,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                            lineNumber: 466,
+                                            lineNumber: 486,
                                             columnNumber: 19
                                         }, ("TURBOPACK compile-time value", void 0))
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                                    lineNumber: 427,
+                                    lineNumber: 447,
                                     columnNumber: 17
                                 }, ("TURBOPACK compile-time value", void 0))
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                            lineNumber: 233,
+                            lineNumber: 247,
                             columnNumber: 13
                         }, ("TURBOPACK compile-time value", void 0))
                     }, void 0, false, {
                         fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                        lineNumber: 216,
+                        lineNumber: 230,
                         columnNumber: 9
                     }, ("TURBOPACK compile-time value", void 0))
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/CustomerAccountModal.tsx",
-                lineNumber: 200,
+                lineNumber: 214,
                 columnNumber: 7
             }, ("TURBOPACK compile-time value", void 0))
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/CustomerAccountModal.tsx",
-        lineNumber: 197,
+        lineNumber: 211,
         columnNumber: 5
     }, ("TURBOPACK compile-time value", void 0));
 };
@@ -2218,6 +2252,11 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$i18n$2f$translations$
 ;
 const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
     const [quantity, setQuantity] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(1);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
+        setQuantity(1);
+    }, [
+        product?.id
+    ]);
     if (!product) return null;
     const title = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$i18n$2f$translations$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getLocalizedProductName"])(product, lang);
     const desc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$i18n$2f$translations$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getLocalizedProductDescription"])(product, lang);
@@ -2231,11 +2270,11 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                 onClick: onClose
             }, void 0, false, {
                 fileName: "[project]/src/components/ProductModal.tsx",
-                lineNumber: 39,
+                lineNumber: 43,
                 columnNumber: 7
             }, ("TURBOPACK compile-time value", void 0)),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] text-[var(--ufb-text)] shadow-2xl",
+                className: "relative z-10 max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] text-[var(--ufb-text)] shadow-2xl",
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                         type: "button",
@@ -2246,12 +2285,12 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                             className: "h-5 w-5"
                         }, void 0, false, {
                             fileName: "[project]/src/components/ProductModal.tsx",
-                            lineNumber: 48,
+                            lineNumber: 52,
                             columnNumber: 11
                         }, ("TURBOPACK compile-time value", void 0))
                     }, void 0, false, {
                         fileName: "[project]/src/components/ProductModal.tsx",
-                        lineNumber: 42,
+                        lineNumber: 46,
                         columnNumber: 9
                     }, ("TURBOPACK compile-time value", void 0)),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2266,7 +2305,7 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                     className: "h-full w-full object-cover"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/ProductModal.tsx",
-                                    lineNumber: 55,
+                                    lineNumber: 59,
                                     columnNumber: 15
                                 }, ("TURBOPACK compile-time value", void 0)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                     className: "flex flex-col items-center justify-center p-8 text-center",
@@ -2277,12 +2316,12 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                                 className: "h-8 w-8 text-[#F47B20]/70"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                lineNumber: 64,
+                                                lineNumber: 68,
                                                 columnNumber: 19
                                             }, ("TURBOPACK compile-time value", void 0))
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/ProductModal.tsx",
-                                            lineNumber: 63,
+                                            lineNumber: 67,
                                             columnNumber: 17
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -2290,18 +2329,18 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                             children: t.catalog.noPhotoYet
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/ProductModal.tsx",
-                                            lineNumber: 66,
+                                            lineNumber: 70,
                                             columnNumber: 17
                                         }, ("TURBOPACK compile-time value", void 0))
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/ProductModal.tsx",
-                                    lineNumber: 62,
+                                    lineNumber: 66,
                                     columnNumber: 15
                                 }, ("TURBOPACK compile-time value", void 0))
                             }, void 0, false, {
                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                lineNumber: 53,
+                                lineNumber: 57,
                                 columnNumber: 11
                             }, ("TURBOPACK compile-time value", void 0)),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2317,12 +2356,12 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                                     children: product.isAvailable ? t.catalog.available : t.catalog.unavailable
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/ProductModal.tsx",
-                                                    lineNumber: 75,
+                                                    lineNumber: 79,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                lineNumber: 74,
+                                                lineNumber: 78,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0)),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
@@ -2330,7 +2369,7 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                                 children: title
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                lineNumber: 80,
+                                                lineNumber: 84,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0)),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -2338,7 +2377,7 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                                 children: desc || t.catalog.noDescriptionYet
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                lineNumber: 82,
+                                                lineNumber: 86,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0)),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2351,7 +2390,7 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                                                 children: t.productModal.usdPrice
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                                lineNumber: 88,
+                                                                lineNumber: 92,
                                                                 columnNumber: 19
                                                             }, ("TURBOPACK compile-time value", void 0)),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2359,13 +2398,13 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                                                 children: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$i18n$2f$translations$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["formatMoney"])(product.priceUsd, 'USD')
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                                lineNumber: 91,
+                                                                lineNumber: 95,
                                                                 columnNumber: 19
                                                             }, ("TURBOPACK compile-time value", void 0))
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/ProductModal.tsx",
-                                                        lineNumber: 87,
+                                                        lineNumber: 91,
                                                         columnNumber: 17
                                                     }, ("TURBOPACK compile-time value", void 0)),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2375,7 +2414,7 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                                                 children: t.productModal.htgPrice
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                                lineNumber: 100,
+                                                                lineNumber: 104,
                                                                 columnNumber: 19
                                                             }, ("TURBOPACK compile-time value", void 0)),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2383,25 +2422,25 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                                                 children: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$i18n$2f$translations$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["formatMoney"])(product.priceHtg, 'HTG')
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                                lineNumber: 103,
+                                                                lineNumber: 107,
                                                                 columnNumber: 19
                                                             }, ("TURBOPACK compile-time value", void 0))
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/ProductModal.tsx",
-                                                        lineNumber: 99,
+                                                        lineNumber: 103,
                                                         columnNumber: 17
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                lineNumber: 86,
+                                                lineNumber: 90,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0))
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/ProductModal.tsx",
-                                        lineNumber: 73,
+                                        lineNumber: 77,
                                         columnNumber: 13
                                     }, ("TURBOPACK compile-time value", void 0)),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2415,7 +2454,7 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                                         children: t.productModal.quantity
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/ProductModal.tsx",
-                                                        lineNumber: 116,
+                                                        lineNumber: 120,
                                                         columnNumber: 17
                                                     }, ("TURBOPACK compile-time value", void 0)),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2430,12 +2469,12 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                                                     className: "h-4 w-4"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/ProductModal.tsx",
-                                                                    lineNumber: 126,
+                                                                    lineNumber: 130,
                                                                     columnNumber: 21
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                                lineNumber: 120,
+                                                                lineNumber: 124,
                                                                 columnNumber: 19
                                                             }, ("TURBOPACK compile-time value", void 0)),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2443,7 +2482,7 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                                                 children: quantity
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                                lineNumber: 128,
+                                                                lineNumber: 132,
                                                                 columnNumber: 19
                                                             }, ("TURBOPACK compile-time value", void 0)),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -2455,24 +2494,24 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                                                     className: "h-4 w-4"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/ProductModal.tsx",
-                                                                    lineNumber: 135,
+                                                                    lineNumber: 139,
                                                                     columnNumber: 21
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                                lineNumber: 129,
+                                                                lineNumber: 133,
                                                                 columnNumber: 19
                                                             }, ("TURBOPACK compile-time value", void 0))
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/ProductModal.tsx",
-                                                        lineNumber: 119,
+                                                        lineNumber: 123,
                                                         columnNumber: 17
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                lineNumber: 115,
+                                                lineNumber: 119,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0)),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -2489,50 +2528,50 @@ const ProductModal = ({ product, onClose, lang, currency, t, onAddToCart })=>{
                                                         className: "h-4 w-4"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/ProductModal.tsx",
-                                                        lineNumber: 150,
+                                                        lineNumber: 154,
                                                         columnNumber: 17
                                                     }, ("TURBOPACK compile-time value", void 0)),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                         children: t.productModal.addToCart
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/ProductModal.tsx",
-                                                        lineNumber: 151,
+                                                        lineNumber: 155,
                                                         columnNumber: 17
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                                lineNumber: 140,
+                                                lineNumber: 144,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0))
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/ProductModal.tsx",
-                                        lineNumber: 114,
+                                        lineNumber: 118,
                                         columnNumber: 13
                                     }, ("TURBOPACK compile-time value", void 0))
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/ProductModal.tsx",
-                                lineNumber: 72,
+                                lineNumber: 76,
                                 columnNumber: 11
                             }, ("TURBOPACK compile-time value", void 0))
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/ProductModal.tsx",
-                        lineNumber: 51,
+                        lineNumber: 55,
                         columnNumber: 9
                     }, ("TURBOPACK compile-time value", void 0))
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/ProductModal.tsx",
-                lineNumber: 41,
+                lineNumber: 45,
                 columnNumber: 7
             }, ("TURBOPACK compile-time value", void 0))
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/ProductModal.tsx",
-        lineNumber: 38,
+        lineNumber: 42,
         columnNumber: 5
     }, ("TURBOPACK compile-time value", void 0));
 };
@@ -2569,6 +2608,19 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$fetch$2d$json$
 ;
 ;
 ;
+function formatUtcDate(dateValue) {
+    const d = new Date(dateValue);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10);
+}
+function safeHttpUrl(url) {
+    if (!url) return null;
+    const trimmed = url.trim();
+    if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) {
+        return trimmed;
+    }
+    return null;
+}
 const Storefront = ({ settings, products, comments, onCommentAdded, loading, error, onRetry, lang, onLangChange, currency, onCurrencyChange, theme, onThemeChange, t, cart, onAddToCart, onOpenCart, onSelectProduct, onOpenAccount, customerEmail, onOpenAdmin })=>{
     const [justAddedId, setJustAddedId] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const [trackInput, setTrackInput] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])('');
@@ -2676,12 +2728,12 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                     className: `w-[min(88vw,780px)] max-h-[82vh] object-contain transition-opacity duration-300 ${theme === 'dark' ? 'opacity-[0.045] rounded-3xl' : 'opacity-[var(--ufb-watermark-opacity)]'}`
                 }, void 0, false, {
                     fileName: "[project]/src/components/Storefront.tsx",
-                    lineNumber: 230,
+                    lineNumber: 245,
                     columnNumber: 9
                 }, ("TURBOPACK compile-time value", void 0))
             }, void 0, false, {
                 fileName: "[project]/src/components/Storefront.tsx",
-                lineNumber: 226,
+                lineNumber: 241,
                 columnNumber: 7
             }, ("TURBOPACK compile-time value", void 0)),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("header", {
@@ -2699,7 +2751,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                     className: "h-9 w-9 rounded-lg object-contain bg-[#FAF5EE] border border-[var(--ufb-border)] p-0.5"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 244,
+                                    lineNumber: 259,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2709,7 +2761,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                             children: "Ur"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 250,
+                                            lineNumber: 265,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2717,26 +2769,26 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                             children: "Food"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 251,
+                                            lineNumber: 266,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                             children: "Box"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 252,
+                                            lineNumber: 267,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0))
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 249,
+                                    lineNumber: 264,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0))
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/Storefront.tsx",
-                            lineNumber: 243,
+                            lineNumber: 258,
                             columnNumber: 11
                         }, ("TURBOPACK compile-time value", void 0)),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("nav", {
@@ -2748,7 +2800,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                     children: t.nav.boxes
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 258,
+                                    lineNumber: 273,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -2757,7 +2809,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                     children: t.nav.delivery
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 264,
+                                    lineNumber: 279,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -2766,7 +2818,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                     children: t.nav.customBox
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 270,
+                                    lineNumber: 285,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -2775,13 +2827,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                     children: t.nav.trackOrder
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 276,
+                                    lineNumber: 291,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0))
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/Storefront.tsx",
-                            lineNumber: 257,
+                            lineNumber: 272,
                             columnNumber: 11
                         }, ("TURBOPACK compile-time value", void 0)),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2795,7 +2847,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                         className: "h-4 w-4"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 291,
+                                        lineNumber: 306,
                                         columnNumber: 15
                                     }, ("TURBOPACK compile-time value", void 0)),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2807,224 +2859,272 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 292,
+                                        lineNumber: 307,
                                         columnNumber: 15
                                     }, ("TURBOPACK compile-time value", void 0))
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/Storefront.tsx",
-                                lineNumber: 286,
+                                lineNumber: 301,
                                 columnNumber: 13
                             }, ("TURBOPACK compile-time value", void 0))
                         }, void 0, false, {
                             fileName: "[project]/src/components/Storefront.tsx",
-                            lineNumber: 285,
+                            lineNumber: 300,
                             columnNumber: 11
                         }, ("TURBOPACK compile-time value", void 0))
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/Storefront.tsx",
-                    lineNumber: 241,
+                    lineNumber: 256,
                     columnNumber: 9
                 }, ("TURBOPACK compile-time value", void 0))
             }, void 0, false, {
                 fileName: "[project]/src/components/Storefront.tsx",
-                lineNumber: 240,
+                lineNumber: 255,
                 columnNumber: 7
             }, ("TURBOPACK compile-time value", void 0)),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "relative z-20 border-b border-[var(--ufb-border)] bg-[var(--ufb-surface)]/80 backdrop-blur-sm",
-                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                    className: "mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-2",
-                    children: [
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "flex flex-wrap items-center gap-3",
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "inline-flex items-center gap-1 rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] p-0.5",
-                                    children: [
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$globe$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Globe$3e$__["Globe"], {
-                                            className: "ml-2 h-3.5 w-3.5 text-[var(--ufb-muted)]",
-                                            "aria-hidden": "true"
-                                        }, void 0, false, {
-                                            fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 306,
-                                            columnNumber: 15
-                                        }, ("TURBOPACK compile-time value", void 0)),
-                                        [
-                                            'en',
-                                            'fr',
-                                            'ht'
-                                        ].map((code)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                                type: "button",
-                                                onClick: ()=>onLangChange(code),
-                                                className: `px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${lang === code ? 'bg-[#F47B20] text-white' : 'text-[var(--ufb-muted)] hover:text-[var(--ufb-text)]'}`,
-                                                children: t.languages[code]
-                                            }, code, false, {
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-2",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "flex flex-wrap items-center gap-3",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "inline-flex items-center gap-1 rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] p-0.5",
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$globe$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Globe$3e$__["Globe"], {
+                                                className: "ml-2 h-3.5 w-3.5 text-[var(--ufb-muted)]",
+                                                "aria-hidden": "true"
+                                            }, void 0, false, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 308,
+                                                lineNumber: 321,
+                                                columnNumber: 15
+                                            }, ("TURBOPACK compile-time value", void 0)),
+                                            [
+                                                'en',
+                                                'fr',
+                                                'ht'
+                                            ].map((code)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    type: "button",
+                                                    onClick: ()=>onLangChange(code),
+                                                    className: `px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${lang === code ? 'bg-[#F47B20] text-white' : 'text-[var(--ufb-muted)] hover:text-[var(--ufb-text)]'}`,
+                                                    children: t.languages[code]
+                                                }, code, false, {
+                                                    fileName: "[project]/src/components/Storefront.tsx",
+                                                    lineNumber: 323,
+                                                    columnNumber: 17
+                                                }, ("TURBOPACK compile-time value", void 0)))
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/src/components/Storefront.tsx",
+                                        lineNumber: 320,
+                                        columnNumber: 13
+                                    }, ("TURBOPACK compile-time value", void 0)),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "inline-flex items-center rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] p-0.5",
+                                        children: [
+                                            'USD',
+                                            'HTG'
+                                        ].map((curr)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                type: "button",
+                                                onClick: ()=>onCurrencyChange(curr),
+                                                className: `px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${currency === curr ? 'bg-[#238447] text-white' : 'text-[var(--ufb-muted)] hover:text-[var(--ufb-text)]'}`,
+                                                children: curr
+                                            }, curr, false, {
+                                                fileName: "[project]/src/components/Storefront.tsx",
+                                                lineNumber: 341,
                                                 columnNumber: 17
                                             }, ("TURBOPACK compile-time value", void 0)))
-                                    ]
-                                }, void 0, true, {
-                                    fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 305,
-                                    columnNumber: 13
-                                }, ("TURBOPACK compile-time value", void 0)),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "inline-flex items-center rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] p-0.5",
-                                    children: [
-                                        'USD',
-                                        'HTG'
-                                    ].map((curr)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                            type: "button",
-                                            onClick: ()=>onCurrencyChange(curr),
-                                            className: `px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${currency === curr ? 'bg-[#238447] text-white' : 'text-[var(--ufb-muted)] hover:text-[var(--ufb-text)]'}`,
-                                            children: curr
-                                        }, curr, false, {
-                                            fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 326,
-                                            columnNumber: 17
-                                        }, ("TURBOPACK compile-time value", void 0)))
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 324,
-                                    columnNumber: 13
-                                }, ("TURBOPACK compile-time value", void 0))
-                            ]
-                        }, void 0, true, {
-                            fileName: "[project]/src/components/Storefront.tsx",
-                            lineNumber: 303,
-                            columnNumber: 11
-                        }, ("TURBOPACK compile-time value", void 0)),
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "flex flex-wrap items-center gap-3",
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "inline-flex items-center rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] p-0.5",
-                                    children: [
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                            type: "button",
-                                            onClick: ()=>onThemeChange('light'),
-                                            className: `inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${theme === 'light' ? 'bg-[#171717] text-white' : 'text-[var(--ufb-muted)] hover:text-[var(--ufb-text)]'}`,
-                                            children: [
-                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$sun$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Sun$3e$__["Sun"], {
-                                                    className: "h-3 w-3"
-                                                }, void 0, false, {
-                                                    fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 354,
-                                                    columnNumber: 17
-                                                }, ("TURBOPACK compile-time value", void 0)),
-                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                    children: t.themes.light
-                                                }, void 0, false, {
-                                                    fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 355,
-                                                    columnNumber: 17
-                                                }, ("TURBOPACK compile-time value", void 0))
-                                            ]
-                                        }, void 0, true, {
-                                            fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 345,
-                                            columnNumber: 15
-                                        }, ("TURBOPACK compile-time value", void 0)),
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                            type: "button",
-                                            onClick: ()=>onThemeChange('dark'),
-                                            className: `inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${theme === 'dark' ? 'bg-white text-[#171717]' : 'text-[var(--ufb-muted)] hover:text-[var(--ufb-text)]'}`,
-                                            children: [
-                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$moon$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Moon$3e$__["Moon"], {
-                                                    className: "h-3 w-3"
-                                                }, void 0, false, {
-                                                    fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 366,
-                                                    columnNumber: 17
-                                                }, ("TURBOPACK compile-time value", void 0)),
-                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                    children: t.themes.dark
-                                                }, void 0, false, {
-                                                    fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 367,
-                                                    columnNumber: 17
-                                                }, ("TURBOPACK compile-time value", void 0))
-                                            ]
-                                        }, void 0, true, {
-                                            fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 357,
-                                            columnNumber: 15
-                                        }, ("TURBOPACK compile-time value", void 0)),
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                            type: "button",
-                                            onClick: ()=>onThemeChange('brand'),
-                                            className: `inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${theme === 'brand' ? 'bg-[#F47B20] text-white' : 'text-[var(--ufb-muted)] hover:text-[var(--ufb-text)]'}`,
-                                            children: [
-                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$palette$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Palette$3e$__["Palette"], {
-                                                    className: "h-3 w-3"
-                                                }, void 0, false, {
-                                                    fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 378,
-                                                    columnNumber: 17
-                                                }, ("TURBOPACK compile-time value", void 0)),
-                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                    children: t.themes.brand
-                                                }, void 0, false, {
-                                                    fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 379,
-                                                    columnNumber: 17
-                                                }, ("TURBOPACK compile-time value", void 0))
-                                            ]
-                                        }, void 0, true, {
-                                            fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 369,
-                                            columnNumber: 15
-                                        }, ("TURBOPACK compile-time value", void 0))
-                                    ]
-                                }, void 0, true, {
-                                    fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 344,
-                                    columnNumber: 13
-                                }, ("TURBOPACK compile-time value", void 0)),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                    type: "button",
-                                    onClick: onOpenAccount,
-                                    className: "inline-flex items-center gap-1.5 rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] px-3 py-1.5 text-xs font-semibold hover:border-[#F47B20] transition-colors whitespace-nowrap",
-                                    children: [
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$user$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__User$3e$__["User"], {
-                                            className: "h-3.5 w-3.5 text-[#F47B20]"
-                                        }, void 0, false, {
-                                            fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 389,
-                                            columnNumber: 15
-                                        }, ("TURBOPACK compile-time value", void 0)),
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                            className: "max-w-[140px] truncate",
-                                            children: customerEmail || t.nav.account
-                                        }, void 0, false, {
-                                            fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 390,
-                                            columnNumber: 15
-                                        }, ("TURBOPACK compile-time value", void 0))
-                                    ]
-                                }, void 0, true, {
-                                    fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 384,
-                                    columnNumber: 13
-                                }, ("TURBOPACK compile-time value", void 0))
-                            ]
-                        }, void 0, true, {
-                            fileName: "[project]/src/components/Storefront.tsx",
-                            lineNumber: 342,
-                            columnNumber: 11
-                        }, ("TURBOPACK compile-time value", void 0))
-                    ]
-                }, void 0, true, {
-                    fileName: "[project]/src/components/Storefront.tsx",
-                    lineNumber: 302,
-                    columnNumber: 9
-                }, ("TURBOPACK compile-time value", void 0))
-            }, void 0, false, {
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/Storefront.tsx",
+                                        lineNumber: 339,
+                                        columnNumber: 13
+                                    }, ("TURBOPACK compile-time value", void 0))
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/src/components/Storefront.tsx",
+                                lineNumber: 318,
+                                columnNumber: 11
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "flex flex-wrap items-center gap-3",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "inline-flex items-center rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] p-0.5",
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                type: "button",
+                                                onClick: ()=>onThemeChange('light'),
+                                                className: `inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${theme === 'light' ? 'bg-[#171717] text-white' : 'text-[var(--ufb-muted)] hover:text-[var(--ufb-text)]'}`,
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$sun$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Sun$3e$__["Sun"], {
+                                                        className: "h-3 w-3"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/Storefront.tsx",
+                                                        lineNumber: 369,
+                                                        columnNumber: 17
+                                                    }, ("TURBOPACK compile-time value", void 0)),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        children: t.themes.light
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/Storefront.tsx",
+                                                        lineNumber: 370,
+                                                        columnNumber: 17
+                                                    }, ("TURBOPACK compile-time value", void 0))
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/Storefront.tsx",
+                                                lineNumber: 360,
+                                                columnNumber: 15
+                                            }, ("TURBOPACK compile-time value", void 0)),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                type: "button",
+                                                onClick: ()=>onThemeChange('dark'),
+                                                className: `inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${theme === 'dark' ? 'bg-white text-[#171717]' : 'text-[var(--ufb-muted)] hover:text-[var(--ufb-text)]'}`,
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$moon$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Moon$3e$__["Moon"], {
+                                                        className: "h-3 w-3"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/Storefront.tsx",
+                                                        lineNumber: 381,
+                                                        columnNumber: 17
+                                                    }, ("TURBOPACK compile-time value", void 0)),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        children: t.themes.dark
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/Storefront.tsx",
+                                                        lineNumber: 382,
+                                                        columnNumber: 17
+                                                    }, ("TURBOPACK compile-time value", void 0))
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/Storefront.tsx",
+                                                lineNumber: 372,
+                                                columnNumber: 15
+                                            }, ("TURBOPACK compile-time value", void 0)),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                type: "button",
+                                                onClick: ()=>onThemeChange('brand'),
+                                                className: `inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${theme === 'brand' ? 'bg-[#F47B20] text-white' : 'text-[var(--ufb-muted)] hover:text-[var(--ufb-text)]'}`,
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$palette$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Palette$3e$__["Palette"], {
+                                                        className: "h-3 w-3"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/Storefront.tsx",
+                                                        lineNumber: 393,
+                                                        columnNumber: 17
+                                                    }, ("TURBOPACK compile-time value", void 0)),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        children: t.themes.brand
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/components/Storefront.tsx",
+                                                        lineNumber: 394,
+                                                        columnNumber: 17
+                                                    }, ("TURBOPACK compile-time value", void 0))
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/components/Storefront.tsx",
+                                                lineNumber: 384,
+                                                columnNumber: 15
+                                            }, ("TURBOPACK compile-time value", void 0))
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/src/components/Storefront.tsx",
+                                        lineNumber: 359,
+                                        columnNumber: 13
+                                    }, ("TURBOPACK compile-time value", void 0)),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        type: "button",
+                                        onClick: onOpenAccount,
+                                        className: "inline-flex items-center gap-1.5 rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-card)] px-3 py-1.5 text-xs font-semibold hover:border-[#F47B20] transition-colors whitespace-nowrap",
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$user$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__User$3e$__["User"], {
+                                                className: "h-3.5 w-3.5 text-[#F47B20]"
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/Storefront.tsx",
+                                                lineNumber: 404,
+                                                columnNumber: 15
+                                            }, ("TURBOPACK compile-time value", void 0)),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                className: "max-w-[140px] truncate",
+                                                children: customerEmail || t.nav.account
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/Storefront.tsx",
+                                                lineNumber: 405,
+                                                columnNumber: 15
+                                            }, ("TURBOPACK compile-time value", void 0))
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/src/components/Storefront.tsx",
+                                        lineNumber: 399,
+                                        columnNumber: 13
+                                    }, ("TURBOPACK compile-time value", void 0))
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/src/components/Storefront.tsx",
+                                lineNumber: 357,
+                                columnNumber: 11
+                            }, ("TURBOPACK compile-time value", void 0))
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/components/Storefront.tsx",
+                        lineNumber: 317,
+                        columnNumber: 9
+                    }, ("TURBOPACK compile-time value", void 0)),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("nav", {
+                        "aria-label": "Mobile sections",
+                        className: "md:hidden border-t border-[var(--ufb-border)]/70 px-4 py-1.5 flex items-center gap-4 overflow-x-auto text-xs font-semibold text-[var(--ufb-muted)]",
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                href: "#boxes",
+                                className: "hover:text-[#F47B20] whitespace-nowrap shrink-0 py-0.5",
+                                children: t.nav.boxes
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/Storefront.tsx",
+                                lineNumber: 417,
+                                columnNumber: 11
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                href: "#delivery",
+                                className: "hover:text-[#F47B20] whitespace-nowrap shrink-0 py-0.5",
+                                children: t.nav.delivery
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/Storefront.tsx",
+                                lineNumber: 420,
+                                columnNumber: 11
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                href: "#custom-box",
+                                className: "hover:text-[#F47B20] whitespace-nowrap shrink-0 py-0.5",
+                                children: t.nav.customBox
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/Storefront.tsx",
+                                lineNumber: 423,
+                                columnNumber: 11
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                href: "#track",
+                                className: "hover:text-[#F47B20] whitespace-nowrap shrink-0 py-0.5",
+                                children: t.nav.trackOrder
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/Storefront.tsx",
+                                lineNumber: 426,
+                                columnNumber: 11
+                            }, ("TURBOPACK compile-time value", void 0))
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/components/Storefront.tsx",
+                        lineNumber: 413,
+                        columnNumber: 9
+                    }, ("TURBOPACK compile-time value", void 0))
+                ]
+            }, void 0, true, {
                 fileName: "[project]/src/components/Storefront.tsx",
-                lineNumber: 301,
+                lineNumber: 316,
                 columnNumber: 7
             }, ("TURBOPACK compile-time value", void 0)),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("main", {
@@ -3043,7 +3143,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                             children: settings?.slogan || 'Machew devan pot kay ou.'
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 404,
+                                            lineNumber: 438,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
@@ -3055,7 +3155,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                             children: heroTitle || 'Your Grocery Market, Right at Your Door'
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 408,
+                                            lineNumber: 442,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3063,7 +3163,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                             children: heroSubtitle || 'Order quality food boxes effortlessly in USD or HTG and let UrFoodBox handle careful preparation and doorstep delivery.'
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 415,
+                                            lineNumber: 449,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3076,12 +3176,12 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                         children: t.hero.exploreCta
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 425,
+                                                        lineNumber: 459,
                                                         columnNumber: 19
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 421,
+                                                    lineNumber: 455,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -3091,18 +3191,18 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                         children: t.hero.customCta
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 431,
+                                                        lineNumber: 465,
                                                         columnNumber: 19
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 427,
+                                                    lineNumber: 461,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 420,
+                                            lineNumber: 454,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3112,7 +3212,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     children: t.hero.guestNote
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 436,
+                                                    lineNumber: 470,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3120,7 +3220,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     children: "·"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 437,
+                                                    lineNumber: 471,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3133,19 +3233,19 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 438,
+                                                    lineNumber: 472,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 435,
+                                            lineNumber: 469,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0))
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 403,
+                                    lineNumber: 437,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3158,28 +3258,28 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                             className: "max-h-[300px] w-auto object-contain"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 447,
+                                            lineNumber: 481,
                                             columnNumber: 17
                                         }, ("TURBOPACK compile-time value", void 0))
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 446,
+                                        lineNumber: 480,
                                         columnNumber: 15
                                     }, ("TURBOPACK compile-time value", void 0))
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 445,
+                                    lineNumber: 479,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0))
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/Storefront.tsx",
-                            lineNumber: 402,
+                            lineNumber: 436,
                             columnNumber: 11
                         }, ("TURBOPACK compile-time value", void 0))
                     }, void 0, false, {
                         fileName: "[project]/src/components/Storefront.tsx",
-                        lineNumber: 401,
+                        lineNumber: 435,
                         columnNumber: 9
                     }, ("TURBOPACK compile-time value", void 0)),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -3197,7 +3297,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                 children: t.catalog.heading
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 461,
+                                                lineNumber: 495,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0)),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3205,13 +3305,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                 children: t.catalog.subheading
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 464,
+                                                lineNumber: 498,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0))
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 460,
+                                        lineNumber: 494,
                                         columnNumber: 13
                                     }, ("TURBOPACK compile-time value", void 0)),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3219,13 +3319,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                         children: t.catalog.priceNote
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 468,
+                                        lineNumber: 502,
                                         columnNumber: 13
                                     }, ("TURBOPACK compile-time value", void 0))
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/Storefront.tsx",
-                                lineNumber: 459,
+                                lineNumber: 493,
                                 columnNumber: 11
                             }, ("TURBOPACK compile-time value", void 0)),
                             loading ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3238,45 +3338,45 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                         className: "h-96 rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] animate-pulse"
                                     }, idx, false, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 476,
+                                        lineNumber: 510,
                                         columnNumber: 17
                                     }, ("TURBOPACK compile-time value", void 0)))
                             }, void 0, false, {
                                 fileName: "[project]/src/components/Storefront.tsx",
-                                lineNumber: 474,
+                                lineNumber: 508,
                                 columnNumber: 13
                             }, ("TURBOPACK compile-time value", void 0)) : error ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 className: "rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] p-8 text-center space-y-3",
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                        className: "text-sm text-red-600 dark:text-red-400",
+                                        className: "text-sm font-medium text-red-600 dark:text-red-400",
                                         children: error || t.catalog.errorLoad
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 484,
+                                        lineNumber: 518,
                                         columnNumber: 15
                                     }, ("TURBOPACK compile-time value", void 0)),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                         type: "button",
                                         onClick: onRetry,
-                                        className: "rounded-lg bg-[#F47B20] px-4 py-2 text-xs font-semibold text-white",
+                                        className: "rounded-lg bg-[#F47B20] px-4 py-2 text-xs font-semibold text-white hover:bg-[#df6912] transition-colors",
                                         children: t.catalog.retry
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 485,
+                                        lineNumber: 521,
                                         columnNumber: 15
                                     }, ("TURBOPACK compile-time value", void 0))
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/Storefront.tsx",
-                                lineNumber: 483,
+                                lineNumber: 517,
                                 columnNumber: 13
                             }, ("TURBOPACK compile-time value", void 0)) : products.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 className: "rounded-2xl border border-[var(--ufb-border)] bg-[var(--ufb-card)] p-10 text-center text-sm text-[var(--ufb-muted)]",
                                 children: t.catalog.emptyCatalog
                             }, void 0, false, {
                                 fileName: "[project]/src/components/Storefront.tsx",
-                                lineNumber: 494,
+                                lineNumber: 530,
                                 columnNumber: 13
                             }, ("TURBOPACK compile-time value", void 0)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7",
@@ -3303,7 +3403,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             className: "h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 520,
+                                                            lineNumber: 556,
                                                             columnNumber: 27
                                                         }, ("TURBOPACK compile-time value", void 0)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                             className: "flex h-full w-full flex-col items-center justify-center p-6 text-center",
@@ -3314,12 +3414,12 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                         className: "h-7 w-7 text-[#F47B20]/70"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                                        lineNumber: 529,
+                                                                        lineNumber: 565,
                                                                         columnNumber: 31
                                                                     }, ("TURBOPACK compile-time value", void 0))
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 528,
+                                                                    lineNumber: 564,
                                                                     columnNumber: 29
                                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3327,18 +3427,18 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                     children: t.catalog.noPhotoYet
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 531,
+                                                                    lineNumber: 567,
                                                                     columnNumber: 29
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 527,
+                                                            lineNumber: 563,
                                                             columnNumber: 27
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 514,
+                                                        lineNumber: 550,
                                                         columnNumber: 23
                                                     }, ("TURBOPACK compile-time value", void 0)),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3351,12 +3451,12 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                     children: product.isAvailable ? t.catalog.available : t.catalog.unavailable
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 541,
+                                                                    lineNumber: 577,
                                                                     columnNumber: 27
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                                lineNumber: 540,
+                                                                lineNumber: 576,
                                                                 columnNumber: 25
                                                             }, ("TURBOPACK compile-time value", void 0)),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
@@ -3364,7 +3464,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                 children: name
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                                lineNumber: 550,
+                                                                lineNumber: 586,
                                                                 columnNumber: 25
                                                             }, ("TURBOPACK compile-time value", void 0)),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3372,7 +3472,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                 children: desc || t.catalog.noDescriptionYet
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                                lineNumber: 552,
+                                                                lineNumber: 588,
                                                                 columnNumber: 25
                                                             }, ("TURBOPACK compile-time value", void 0)),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3383,7 +3483,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                         children: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$i18n$2f$translations$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["formatMoney"])(activePrice, currency)
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                                        lineNumber: 557,
+                                                                        lineNumber: 593,
                                                                         columnNumber: 27
                                                                     }, ("TURBOPACK compile-time value", void 0)),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3391,25 +3491,25 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                         children: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$i18n$2f$translations$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["formatMoney"])(secondaryPrice, secondaryCurrency)
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                                        lineNumber: 560,
+                                                                        lineNumber: 596,
                                                                         columnNumber: 27
                                                                     }, ("TURBOPACK compile-time value", void 0))
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                                lineNumber: 556,
+                                                                lineNumber: 592,
                                                                 columnNumber: 25
                                                             }, ("TURBOPACK compile-time value", void 0))
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 539,
+                                                        lineNumber: 575,
                                                         columnNumber: 23
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 512,
+                                                lineNumber: 548,
                                                 columnNumber: 21
                                             }, ("TURBOPACK compile-time value", void 0)),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3422,7 +3522,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                         children: t.catalog.viewDetails
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 569,
+                                                        lineNumber: 605,
                                                         columnNumber: 23
                                                     }, ("TURBOPACK compile-time value", void 0)),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3436,20 +3536,20 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                     className: "h-3.5 w-3.5"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 584,
+                                                                    lineNumber: 620,
                                                                     columnNumber: 29
                                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                     children: t.catalog.addedToCart
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 585,
+                                                                    lineNumber: 621,
                                                                     columnNumber: 29
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 583,
+                                                            lineNumber: 619,
                                                             columnNumber: 27
                                                         }, ("TURBOPACK compile-time value", void 0)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
                                                             children: [
@@ -3457,49 +3557,49 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                     className: "h-3.5 w-3.5"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 589,
+                                                                    lineNumber: 625,
                                                                     columnNumber: 29
                                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                     children: t.catalog.addToCart
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 590,
+                                                                    lineNumber: 626,
                                                                     columnNumber: 29
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 588,
+                                                            lineNumber: 624,
                                                             columnNumber: 27
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 576,
+                                                        lineNumber: 612,
                                                         columnNumber: 23
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 568,
+                                                lineNumber: 604,
                                                 columnNumber: 21
                                             }, ("TURBOPACK compile-time value", void 0))
                                         ]
                                     }, product.id, true, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 508,
+                                        lineNumber: 544,
                                         columnNumber: 19
                                     }, ("TURBOPACK compile-time value", void 0));
                                 })
                             }, void 0, false, {
                                 fileName: "[project]/src/components/Storefront.tsx",
-                                lineNumber: 498,
+                                lineNumber: 534,
                                 columnNumber: 13
                             }, ("TURBOPACK compile-time value", void 0))
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/Storefront.tsx",
-                        lineNumber: 458,
+                        lineNumber: 492,
                         columnNumber: 9
                     }, ("TURBOPACK compile-time value", void 0)),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -3516,20 +3616,20 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                 className: "h-6 w-6 text-[#F47B20]"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 606,
+                                                lineNumber: 642,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0)),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 children: t.delivery.heading
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 607,
+                                                lineNumber: 643,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0))
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 605,
+                                        lineNumber: 641,
                                         columnNumber: 13
                                     }, ("TURBOPACK compile-time value", void 0)),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3537,13 +3637,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                         children: t.delivery.subheading
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 609,
+                                        lineNumber: 645,
                                         columnNumber: 13
                                     }, ("TURBOPACK compile-time value", void 0))
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/Storefront.tsx",
-                                lineNumber: 604,
+                                lineNumber: 640,
                                 columnNumber: 11
                             }, ("TURBOPACK compile-time value", void 0)),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3569,7 +3669,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                 children: step.title
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 622,
+                                                lineNumber: 658,
                                                 columnNumber: 17
                                             }, ("TURBOPACK compile-time value", void 0)),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3577,24 +3677,24 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                 children: step.desc
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 623,
+                                                lineNumber: 659,
                                                 columnNumber: 17
                                             }, ("TURBOPACK compile-time value", void 0))
                                         ]
                                     }, idx, true, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 618,
+                                        lineNumber: 654,
                                         columnNumber: 15
                                     }, ("TURBOPACK compile-time value", void 0)))
                             }, void 0, false, {
                                 fileName: "[project]/src/components/Storefront.tsx",
-                                lineNumber: 612,
+                                lineNumber: 648,
                                 columnNumber: 11
                             }, ("TURBOPACK compile-time value", void 0))
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/Storefront.tsx",
-                        lineNumber: 603,
+                        lineNumber: 639,
                         columnNumber: 9
                     }, ("TURBOPACK compile-time value", void 0)),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -3614,7 +3714,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     children: t.customBox.subheading
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 635,
+                                                    lineNumber: 671,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
@@ -3622,7 +3722,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     children: t.customBox.heading
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 636,
+                                                    lineNumber: 672,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3630,7 +3730,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     children: t.customBox.description
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 639,
+                                                    lineNumber: 675,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3647,7 +3747,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                             children: t.cart.boxPeriodLabel
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                                            lineNumber: 647,
+                                                                            lineNumber: 683,
                                                                             columnNumber: 23
                                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                                         resolvedCustomPeriod && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3655,13 +3755,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                             children: resolvedCustomPeriod
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                                            lineNumber: 651,
+                                                                            lineNumber: 687,
                                                                             columnNumber: 25
                                                                         }, ("TURBOPACK compile-time value", void 0))
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 646,
+                                                                    lineNumber: 682,
                                                                     columnNumber: 21
                                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3683,7 +3783,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                                 children: label
                                                                             }, unit, false, {
                                                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                                                lineNumber: 663,
+                                                                                lineNumber: 699,
                                                                                 columnNumber: 25
                                                                             }, ("TURBOPACK compile-time value", void 0))),
                                                                         [
@@ -3699,19 +3799,19 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                                 children: num
                                                                             }, num, false, {
                                                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                                                lineNumber: 679,
+                                                                                lineNumber: 715,
                                                                                 columnNumber: 25
                                                                             }, ("TURBOPACK compile-time value", void 0)))
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 656,
+                                                                    lineNumber: 692,
                                                                     columnNumber: 21
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 645,
+                                                            lineNumber: 681,
                                                             columnNumber: 19
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3722,7 +3822,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                     children: t.cart.householdSizeLabel
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 697,
+                                                                    lineNumber: 733,
                                                                     columnNumber: 21
                                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3741,7 +3841,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                                 children: count
                                                                             }, count, false, {
                                                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                                                lineNumber: 702,
+                                                                                lineNumber: 738,
                                                                                 columnNumber: 25
                                                                             }, ("TURBOPACK compile-time value", void 0))),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -3754,7 +3854,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                             className: "w-16 rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] px-2 py-1.5 text-center font-mono-num text-xs font-semibold focus:border-[#F47B20] focus:outline-none"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                                            lineNumber: 717,
+                                                                            lineNumber: 753,
                                                                             columnNumber: 23
                                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3762,31 +3862,31 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                             children: Number(customBoxPersons) === 1 ? t.cart.personSingular : t.cart.personsUnit
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                                            lineNumber: 726,
+                                                                            lineNumber: 762,
                                                                             columnNumber: 23
                                                                         }, ("TURBOPACK compile-time value", void 0))
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 700,
+                                                                    lineNumber: 736,
                                                                     columnNumber: 21
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 696,
+                                                            lineNumber: 732,
                                                             columnNumber: 19
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 644,
+                                                    lineNumber: 680,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 634,
+                                            lineNumber: 670,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3800,27 +3900,27 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                         className: "h-4 w-4"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 742,
+                                                        lineNumber: 778,
                                                         columnNumber: 21
                                                     }, ("TURBOPACK compile-time value", void 0)),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                         children: t.customBox.whatsappCta
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 743,
+                                                        lineNumber: 779,
                                                         columnNumber: 21
                                                     }, ("TURBOPACK compile-time value", void 0)),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$external$2d$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ExternalLink$3e$__["ExternalLink"], {
                                                         className: "h-3.5 w-3.5 opacity-80"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 744,
+                                                        lineNumber: 780,
                                                         columnNumber: 21
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 736,
+                                                lineNumber: 772,
                                                 columnNumber: 19
                                             }, ("TURBOPACK compile-time value", void 0)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                 className: "inline-flex items-center gap-2.5 rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] px-4 py-3 text-xs text-[var(--ufb-muted)]",
@@ -3829,31 +3929,31 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                         className: "h-4 w-4 text-[#238447]"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 748,
+                                                        lineNumber: 784,
                                                         columnNumber: 21
                                                     }, ("TURBOPACK compile-time value", void 0)),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                         children: t.customBox.whatsappNotConfigured
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 749,
+                                                        lineNumber: 785,
                                                         columnNumber: 21
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 747,
+                                                lineNumber: 783,
                                                 columnNumber: 19
                                             }, ("TURBOPACK compile-time value", void 0))
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 734,
+                                            lineNumber: 770,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0))
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 633,
+                                    lineNumber: 669,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3868,7 +3968,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     children: t.tracker.heading
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 761,
+                                                    lineNumber: 797,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3876,13 +3976,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     children: t.tracker.subheading
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 762,
+                                                    lineNumber: 798,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 760,
+                                            lineNumber: 796,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -3897,7 +3997,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     className: "min-w-0 flex-1 rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] px-3.5 py-2.5 font-mono-num text-xs sm:text-sm focus:border-[#F47B20] focus:outline-none"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 766,
+                                                    lineNumber: 802,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3909,26 +4009,26 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             className: "h-3.5 w-3.5"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 778,
+                                                            lineNumber: 814,
                                                             columnNumber: 19
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                             children: tracking ? t.tracker.searching : t.tracker.button
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 779,
+                                                            lineNumber: 815,
                                                             columnNumber: 19
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 773,
+                                                    lineNumber: 809,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 765,
+                                            lineNumber: 801,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         trackError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3936,7 +4036,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                             children: trackError
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 784,
+                                            lineNumber: 820,
                                             columnNumber: 17
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         trackedOrder && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3950,7 +4050,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             children: t.tracker.reference
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 792,
+                                                            lineNumber: 828,
                                                             columnNumber: 21
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3958,13 +4058,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             children: trackedOrder.orderReference
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 793,
+                                                            lineNumber: 829,
                                                             columnNumber: 21
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 791,
+                                                    lineNumber: 827,
                                                     columnNumber: 19
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3975,7 +4075,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             children: t.tracker.status
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 798,
+                                                            lineNumber: 834,
                                                             columnNumber: 21
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3983,13 +4083,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             children: t.orderStatuses[trackedOrder.status] || trackedOrder.status
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 799,
+                                                            lineNumber: 835,
                                                             columnNumber: 21
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 797,
+                                                    lineNumber: 833,
                                                     columnNumber: 19
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4000,7 +4100,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             children: t.tracker.total
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 804,
+                                                            lineNumber: 840,
                                                             columnNumber: 21
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4008,13 +4108,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             children: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$i18n$2f$translations$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["formatMoney"])(trackedOrder.totalAmount, trackedOrder.currency)
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 805,
+                                                            lineNumber: 841,
                                                             columnNumber: 21
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 803,
+                                                    lineNumber: 839,
                                                     columnNumber: 19
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 trackedOrder.boxPeriod && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4025,7 +4125,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             children: t.cart.boxPeriodLabel
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 811,
+                                                            lineNumber: 847,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4033,13 +4133,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             children: trackedOrder.boxPeriod
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 812,
+                                                            lineNumber: 848,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 810,
+                                                    lineNumber: 846,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 trackedOrder.householdSize ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4050,7 +4150,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             children: t.cart.householdSizeLabel
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 817,
+                                                            lineNumber: 853,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4062,13 +4162,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 818,
+                                                            lineNumber: 854,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 816,
+                                                    lineNumber: 852,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0)) : null,
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4076,30 +4176,30 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     children: trackedOrder.items.map((i)=>`${i.productName} × ${i.quantity}`).join(' · ')
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 824,
+                                                    lineNumber: 860,
                                                     columnNumber: 19
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 790,
+                                            lineNumber: 826,
                                             columnNumber: 17
                                         }, ("TURBOPACK compile-time value", void 0))
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 756,
+                                    lineNumber: 792,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0))
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/Storefront.tsx",
-                            lineNumber: 631,
+                            lineNumber: 667,
                             columnNumber: 11
                         }, ("TURBOPACK compile-time value", void 0))
                     }, void 0, false, {
                         fileName: "[project]/src/components/Storefront.tsx",
-                        lineNumber: 630,
+                        lineNumber: 666,
                         columnNumber: 9
                     }, ("TURBOPACK compile-time value", void 0)),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -4116,20 +4216,20 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                 className: "h-6 w-6 text-[#F47B20]"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 837,
+                                                lineNumber: 873,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0)),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 children: t.comments.heading
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 838,
+                                                lineNumber: 874,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0))
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 836,
+                                        lineNumber: 872,
                                         columnNumber: 13
                                     }, ("TURBOPACK compile-time value", void 0)),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4137,13 +4237,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                         children: t.comments.subheading
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 840,
+                                        lineNumber: 876,
                                         columnNumber: 13
                                     }, ("TURBOPACK compile-time value", void 0))
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/Storefront.tsx",
-                                lineNumber: 835,
+                                lineNumber: 871,
                                 columnNumber: 11
                             }, ("TURBOPACK compile-time value", void 0)),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4163,7 +4263,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 852,
+                                                        lineNumber: 888,
                                                         columnNumber: 17
                                                     }, ("TURBOPACK compile-time value", void 0)),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -4176,13 +4276,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                         className: "w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] px-3.5 py-2.5 text-sm focus:border-[#F47B20] focus:outline-none"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 855,
+                                                        lineNumber: 891,
                                                         columnNumber: 17
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 851,
+                                                lineNumber: 887,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0)),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4192,7 +4292,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                         children: t.comments.ratingLabel
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 867,
+                                                        lineNumber: 903,
                                                         columnNumber: 17
                                                     }, ("TURBOPACK compile-time value", void 0)),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4212,23 +4312,23 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                     className: `h-5 w-5 ${star <= commentRating ? 'fill-[#F47B20] text-[#F47B20]' : 'text-[var(--ufb-border)]'}`
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 879,
+                                                                    lineNumber: 915,
                                                                     columnNumber: 23
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             }, star, false, {
                                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                                lineNumber: 872,
+                                                                lineNumber: 908,
                                                                 columnNumber: 21
                                                             }, ("TURBOPACK compile-time value", void 0)))
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 870,
+                                                        lineNumber: 906,
                                                         columnNumber: 17
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 866,
+                                                lineNumber: 902,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0)),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4241,7 +4341,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 892,
+                                                        lineNumber: 928,
                                                         columnNumber: 17
                                                     }, ("TURBOPACK compile-time value", void 0)),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("textarea", {
@@ -4254,13 +4354,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                         className: "w-full rounded-lg border border-[var(--ufb-border)] bg-[var(--ufb-surface)] px-3.5 py-2.5 text-sm focus:border-[#F47B20] focus:outline-none"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 895,
+                                                        lineNumber: 931,
                                                         columnNumber: 17
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 891,
+                                                lineNumber: 927,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0)),
                                             commentFeedback && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4268,7 +4368,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                 children: commentFeedback.text
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 907,
+                                                lineNumber: 943,
                                                 columnNumber: 17
                                             }, ("TURBOPACK compile-time value", void 0)),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -4278,13 +4378,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                 children: commentSubmitting ? t.comments.submitting : t.comments.submitBtn
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                lineNumber: 918,
+                                                lineNumber: 954,
                                                 columnNumber: 15
                                             }, ("TURBOPACK compile-time value", void 0))
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 847,
+                                        lineNumber: 883,
                                         columnNumber: 13
                                     }, ("TURBOPACK compile-time value", void 0)),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4294,7 +4394,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                             children: t.comments.emptyState
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 930,
+                                            lineNumber: 966,
                                             columnNumber: 17
                                         }, ("TURBOPACK compile-time value", void 0)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "grid grid-cols-1 sm:grid-cols-2 gap-4",
@@ -4312,7 +4412,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                             children: c.authorName
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                                            lineNumber: 942,
+                                                                            lineNumber: 978,
                                                                             columnNumber: 27
                                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4328,18 +4428,18 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                                     className: `h-3.5 w-3.5 ${star <= c.rating ? 'fill-[#F47B20] text-[#F47B20]' : 'text-[var(--ufb-border)]'}`
                                                                                 }, star, false, {
                                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                                    lineNumber: 947,
+                                                                                    lineNumber: 983,
                                                                                     columnNumber: 31
                                                                                 }, ("TURBOPACK compile-time value", void 0)))
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                                            lineNumber: 945,
+                                                                            lineNumber: 981,
                                                                             columnNumber: 27
                                                                         }, ("TURBOPACK compile-time value", void 0))
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 941,
+                                                                    lineNumber: 977,
                                                                     columnNumber: 25
                                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4347,59 +4447,59 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                     children: c.commentText
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                                    lineNumber: 958,
+                                                                    lineNumber: 994,
                                                                     columnNumber: 25
                                                                 }, ("TURBOPACK compile-time value", void 0))
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 940,
+                                                            lineNumber: 976,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                            className: "text-[11px] text-[var(--ufb-muted)] pt-1 border-t border-[var(--ufb-border)]",
-                                                            children: new Date(c.createdAt).toLocaleDateString()
+                                                            className: "text-[11px] font-mono-num text-[var(--ufb-muted)] pt-1 border-t border-[var(--ufb-border)]",
+                                                            children: formatUtcDate(c.createdAt)
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 962,
+                                                            lineNumber: 998,
                                                             columnNumber: 23
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, c.id, true, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 936,
+                                                    lineNumber: 972,
                                                     columnNumber: 21
                                                 }, ("TURBOPACK compile-time value", void 0)))
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 934,
+                                            lineNumber: 970,
                                             columnNumber: 17
                                         }, ("TURBOPACK compile-time value", void 0))
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/Storefront.tsx",
-                                        lineNumber: 928,
+                                        lineNumber: 964,
                                         columnNumber: 13
                                     }, ("TURBOPACK compile-time value", void 0))
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/Storefront.tsx",
-                                lineNumber: 845,
+                                lineNumber: 881,
                                 columnNumber: 11
                             }, ("TURBOPACK compile-time value", void 0))
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/Storefront.tsx",
-                        lineNumber: 834,
+                        lineNumber: 870,
                         columnNumber: 9
                     }, ("TURBOPACK compile-time value", void 0))
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/Storefront.tsx",
-                lineNumber: 399,
+                lineNumber: 433,
                 columnNumber: 7
             }, ("TURBOPACK compile-time value", void 0)),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("footer", {
-                className: "relative z-10 border-t border-[var(--ufb-border)] bg-[var(--ufb-surface)]",
+                className: "relative z-10 border-t border-[var(--ufb-border)] bg-[var(--ufb-surface)] pb-[env(safe-area-inset-bottom)]",
                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                     className: "mx-auto max-w-7xl px-4 sm:px-6 py-10",
                     children: [
@@ -4416,7 +4516,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     children: "Ur"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 980,
+                                                    lineNumber: 1016,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4424,20 +4524,20 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     children: "Food"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 981,
+                                                    lineNumber: 1017,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                     children: "Box"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 982,
+                                                    lineNumber: 1018,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 979,
+                                            lineNumber: 1015,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4445,7 +4545,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                             children: settings?.slogan || t.footer.tagline
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 984,
+                                            lineNumber: 1020,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         settings?.contactAddress && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4453,13 +4553,13 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                             children: settings.contactAddress
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 988,
+                                            lineNumber: 1024,
                                             columnNumber: 17
                                         }, ("TURBOPACK compile-time value", void 0))
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 978,
+                                    lineNumber: 1014,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4470,7 +4570,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                             children: t.footer.contactTitle
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 993,
+                                            lineNumber: 1029,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4483,12 +4583,12 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                         children: settings.contactEmail
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 999,
+                                                        lineNumber: 1035,
                                                         columnNumber: 21
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 998,
+                                                    lineNumber: 1034,
                                                     columnNumber: 19
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 whatsappHref && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4502,7 +4602,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                 className: "h-3.5 w-3.5"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                                lineNumber: 1015,
+                                                                lineNumber: 1051,
                                                                 columnNumber: 23
                                                             }, ("TURBOPACK compile-time value", void 0)),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4513,30 +4613,30 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/src/components/Storefront.tsx",
-                                                                lineNumber: 1016,
+                                                                lineNumber: 1052,
                                                                 columnNumber: 23
                                                             }, ("TURBOPACK compile-time value", void 0))
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/Storefront.tsx",
-                                                        lineNumber: 1009,
+                                                        lineNumber: 1045,
                                                         columnNumber: 21
                                                     }, ("TURBOPACK compile-time value", void 0))
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 1008,
+                                                    lineNumber: 1044,
                                                     columnNumber: 19
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 996,
+                                            lineNumber: 1032,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0))
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 992,
+                                    lineNumber: 1028,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4547,14 +4647,14 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                             children: t.footer.socialTitle
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 1026,
+                                            lineNumber: 1062,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "flex flex-col space-y-1.5 text-sm",
                                             children: [
-                                                settings?.tiktokUrl ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
-                                                    href: settings.tiktokUrl,
+                                                safeHttpUrl(settings?.tiktokUrl) ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                    href: safeHttpUrl(settings?.tiktokUrl),
                                                     target: "_blank",
                                                     rel: "noopener noreferrer",
                                                     className: "inline-flex items-center gap-1.5 hover:text-[#F47B20] transition-colors",
@@ -4563,31 +4663,31 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             children: "TikTok"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 1037,
+                                                            lineNumber: 1073,
                                                             columnNumber: 21
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$external$2d$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ExternalLink$3e$__["ExternalLink"], {
                                                             className: "h-3 w-3"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 1038,
+                                                            lineNumber: 1074,
                                                             columnNumber: 21
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 1031,
+                                                    lineNumber: 1067,
                                                     columnNumber: 19
                                                 }, ("TURBOPACK compile-time value", void 0)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                     className: "text-xs text-[var(--ufb-muted)]",
                                                     children: "TikTok"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 1041,
+                                                    lineNumber: 1077,
                                                     columnNumber: 19
                                                 }, ("TURBOPACK compile-time value", void 0)),
-                                                settings?.facebookUrl ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
-                                                    href: settings.facebookUrl,
+                                                safeHttpUrl(settings?.facebookUrl) ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                    href: safeHttpUrl(settings?.facebookUrl),
                                                     target: "_blank",
                                                     rel: "noopener noreferrer",
                                                     className: "inline-flex items-center gap-1.5 hover:text-[#F47B20] transition-colors",
@@ -4596,39 +4696,39 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                             children: "Facebook"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 1050,
+                                                            lineNumber: 1086,
                                                             columnNumber: 21
                                                         }, ("TURBOPACK compile-time value", void 0)),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$external$2d$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ExternalLink$3e$__["ExternalLink"], {
                                                             className: "h-3 w-3"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/Storefront.tsx",
-                                                            lineNumber: 1051,
+                                                            lineNumber: 1087,
                                                             columnNumber: 21
                                                         }, ("TURBOPACK compile-time value", void 0))
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 1044,
+                                                    lineNumber: 1080,
                                                     columnNumber: 19
                                                 }, ("TURBOPACK compile-time value", void 0)) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                     className: "text-xs text-[var(--ufb-muted)]",
                                                     children: "Facebook"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 1054,
+                                                    lineNumber: 1090,
                                                     columnNumber: 19
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 1029,
+                                            lineNumber: 1065,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0))
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 1025,
+                                    lineNumber: 1061,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4639,7 +4739,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                             children: t.footer.linksTitle
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 1060,
+                                            lineNumber: 1096,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4651,7 +4751,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     children: t.nav.boxes
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 1064,
+                                                    lineNumber: 1100,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -4660,7 +4760,7 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     children: t.nav.customBox
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 1067,
+                                                    lineNumber: 1103,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0)),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -4670,31 +4770,32 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                                     children: t.footer.adminLink
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/Storefront.tsx",
-                                                    lineNumber: 1070,
+                                                    lineNumber: 1106,
                                                     columnNumber: 17
                                                 }, ("TURBOPACK compile-time value", void 0))
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/Storefront.tsx",
-                                            lineNumber: 1063,
+                                            lineNumber: 1099,
                                             columnNumber: 15
                                         }, ("TURBOPACK compile-time value", void 0))
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 1059,
+                                    lineNumber: 1095,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0))
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/Storefront.tsx",
-                            lineNumber: 977,
+                            lineNumber: 1013,
                             columnNumber: 11
                         }, ("TURBOPACK compile-time value", void 0)),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "mt-8 border-t border-[var(--ufb-border)] pt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--ufb-muted)]",
                             children: [
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                    suppressHydrationWarning: true,
                                     children: [
                                         "© ",
                                         new Date().getFullYear(),
@@ -4705,37 +4806,37 @@ const Storefront = ({ settings, products, comments, onCommentAdded, loading, err
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 1082,
+                                    lineNumber: 1118,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0)),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                     children: settings?.slogan || 'Machew devan pot kay ou.'
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Storefront.tsx",
-                                    lineNumber: 1085,
+                                    lineNumber: 1121,
                                     columnNumber: 13
                                 }, ("TURBOPACK compile-time value", void 0))
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/Storefront.tsx",
-                            lineNumber: 1081,
+                            lineNumber: 1117,
                             columnNumber: 11
                         }, ("TURBOPACK compile-time value", void 0))
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/Storefront.tsx",
-                    lineNumber: 976,
+                    lineNumber: 1012,
                     columnNumber: 9
                 }, ("TURBOPACK compile-time value", void 0))
             }, void 0, false, {
                 fileName: "[project]/src/components/Storefront.tsx",
-                lineNumber: 975,
+                lineNumber: 1011,
                 columnNumber: 7
             }, ("TURBOPACK compile-time value", void 0))
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/Storefront.tsx",
-        lineNumber: 224,
+        lineNumber: 239,
         columnNumber: 5
     }, ("TURBOPACK compile-time value", void 0));
 };
@@ -4751,6 +4852,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$auth$2f$dist$2f$index$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/node_modules/firebase/auth/dist/index.mjs [app-ssr] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$totp$2d$Cx8BEadN$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__K__as__getRedirectResult$3e$__ = __turbopack_context__.i("[project]/node_modules/@firebase/auth/dist/node-esm/totp-Cx8BEadN.js [app-ssr] (ecmascript) <export K as getRedirectResult>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$totp$2d$Cx8BEadN$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$5f$__as__onAuthStateChanged$3e$__ = __turbopack_context__.i("[project]/node_modules/@firebase/auth/dist/node-esm/totp-Cx8BEadN.js [app-ssr] (ecmascript) <export _ as onAuthStateChanged>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$totp$2d$Cx8BEadN$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__ai__as__signInWithPopup$3e$__ = __turbopack_context__.i("[project]/node_modules/@firebase/auth/dist/node-esm/totp-Cx8BEadN.js [app-ssr] (ecmascript) <export ai as signInWithPopup>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$totp$2d$Cx8BEadN$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__ak__as__signOut$3e$__ = __turbopack_context__.i("[project]/node_modules/@firebase/auth/dist/node-esm/totp-Cx8BEadN.js [app-ssr] (ecmascript) <export ak as signOut>");
@@ -4780,7 +4882,7 @@ function readStored(key, allowed, fallback) {
 }
 function StorefrontShell({ initialSettings = null, initialProducts = [], initialComments = [] }) {
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRouter"])();
-    const hasInitialData = initialProducts.length > 0 || initialSettings !== null;
+    const hasInitialData = initialProducts.length > 0 && initialSettings !== null;
     const [lang, setLang] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])('en');
     const [currency, setCurrency] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])('USD');
     const [theme, setTheme] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])('light');
@@ -4889,18 +4991,34 @@ function StorefrontShell({ initialSettings = null, initialProducts = [], initial
             setProducts(data.products || []);
             setComments(data.comments || []);
         } catch (err) {
-            if (!background) {
+            if (!background || products.length === 0) {
                 setStoreError(err.message || 'Could not load storefront catalog.');
             }
         } finally{
             setLoadingStore(false);
         }
-    }, []);
+    }, [
+        products.length
+    ]);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         fetchStorefront(hasInitialData);
     }, [
         fetchStorefront,
         hasInitialData
+    ]);
+    // Safely prune removed product IDs from persisted cart once catalog is confirmed loaded
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
+        if (!prefsLoaded || loadingStore || storeError || products.length === 0) return;
+        const validIds = new Set(products.map((p)=>p.id));
+        setCart((prev)=>{
+            const filtered = prev.filter((item)=>validIds.has(item.productId));
+            return filtered.length === prev.length ? prev : filtered;
+        });
+    }, [
+        prefsLoaded,
+        loadingStore,
+        storeError,
+        products
     ]);
     const getAuthToken = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
         if (!__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["auth"].currentUser) return null;
@@ -4934,6 +5052,14 @@ function StorefrontShell({ initialSettings = null, initialProducts = [], initial
         }
     }, []);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
+        (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$totp$2d$Cx8BEadN$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__K__as__getRedirectResult$3e$__["getRedirectResult"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["auth"]).then((cred)=>{
+            if (cred?.user) {
+                setFirebaseUser(cred.user);
+                loadCustomerAccount(cred.user);
+            }
+        }).catch(()=>{
+        // Ignore non-fatal redirect check errors
+        });
         const unsub = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$totp$2d$Cx8BEadN$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__$5f$__as__onAuthStateChanged$3e$__["onAuthStateChanged"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["auth"], (user)=>{
             setFirebaseUser(user);
             loadCustomerAccount(user);
@@ -4947,6 +5073,12 @@ function StorefrontShell({ initialSettings = null, initialProducts = [], initial
         try {
             const cred = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$totp$2d$Cx8BEadN$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__ai__as__signInWithPopup$3e$__["signInWithPopup"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["auth"], __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$firebase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["googleAuthProvider"]);
             await loadCustomerAccount(cred.user);
+        } catch (err) {
+            const code = err?.code || '';
+            const isTopLevel = ("TURBOPACK compile-time value", "undefined") !== 'undefined' && window.self === window.top;
+            if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
+            ;
+        // User closing popup is non-fatal
         } finally{
             setSigningIn(false);
         }
@@ -5013,7 +5145,7 @@ function StorefrontShell({ initialSettings = null, initialProducts = [], initial
                 onOpenAdmin: ()=>router.push('/admin')
             }, void 0, false, {
                 fileName: "[project]/src/components/StorefrontShell.tsx",
-                lineNumber: 249,
+                lineNumber: 290,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ProductModal$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ProductModal"], {
@@ -5025,7 +5157,7 @@ function StorefrontShell({ initialSettings = null, initialProducts = [], initial
                 onAddToCart: handleAddToCart
             }, void 0, false, {
                 fileName: "[project]/src/components/StorefrontShell.tsx",
-                lineNumber: 273,
+                lineNumber: 314,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$CartDrawer$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CartDrawer"], {
@@ -5044,7 +5176,7 @@ function StorefrontShell({ initialSettings = null, initialProducts = [], initial
                 getAuthToken: getAuthToken
             }, void 0, false, {
                 fileName: "[project]/src/components/StorefrontShell.tsx",
-                lineNumber: 282,
+                lineNumber: 323,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$CustomerAccountModal$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CustomerAccountModal"], {
@@ -5065,13 +5197,13 @@ function StorefrontShell({ initialSettings = null, initialProducts = [], initial
                 onRefreshAccount: ()=>loadCustomerAccount(firebaseUser)
             }, void 0, false, {
                 fileName: "[project]/src/components/StorefrontShell.tsx",
-                lineNumber: 298,
+                lineNumber: 339,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/StorefrontShell.tsx",
-        lineNumber: 248,
+        lineNumber: 289,
         columnNumber: 5
     }, this);
 }
@@ -5763,7 +5895,15 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$firebase$2d$applet$2d$config
 ;
 ;
 ;
-const app = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$firebase$2f$app$2f$dist$2f$esm$2f$index$2e$esm$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["initializeApp"])(__TURBOPACK__imported__module__$5b$project$5d2f$firebase$2d$applet$2d$config$2e$json$2e5b$json$5d2e$cjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"]);
+const resolvedFirebaseConfig = {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim() || __TURBOPACK__imported__module__$5b$project$5d2f$firebase$2d$applet$2d$config$2e$json$2e5b$json$5d2e$cjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].apiKey,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim() || __TURBOPACK__imported__module__$5b$project$5d2f$firebase$2d$applet$2d$config$2e$json$2e5b$json$5d2e$cjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].authDomain,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() || __TURBOPACK__imported__module__$5b$project$5d2f$firebase$2d$applet$2d$config$2e$json$2e5b$json$5d2e$cjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].projectId,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim() || __TURBOPACK__imported__module__$5b$project$5d2f$firebase$2d$applet$2d$config$2e$json$2e5b$json$5d2e$cjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].storageBucket,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim() || __TURBOPACK__imported__module__$5b$project$5d2f$firebase$2d$applet$2d$config$2e$json$2e5b$json$5d2e$cjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].messagingSenderId,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim() || __TURBOPACK__imported__module__$5b$project$5d2f$firebase$2d$applet$2d$config$2e$json$2e5b$json$5d2e$cjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].appId
+};
+const app = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$firebase$2f$app$2f$dist$2f$esm$2f$index$2e$esm$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["getApps"])().length > 0 ? (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$firebase$2f$app$2f$dist$2f$esm$2f$index$2e$esm$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["getApp"])() : (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$firebase$2f$app$2f$dist$2f$esm$2f$index$2e$esm$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__["initializeApp"])(resolvedFirebaseConfig);
 const auth = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$totp$2d$Cx8BEadN$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__D__as__getAuth$3e$__["getAuth"])(app);
 const googleAuthProvider = new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$firebase$2f$auth$2f$dist$2f$node$2d$esm$2f$totp$2d$Cx8BEadN$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__f__as__GoogleAuthProvider$3e$__["GoogleAuthProvider"]();
 googleAuthProvider.setCustomParameters({
