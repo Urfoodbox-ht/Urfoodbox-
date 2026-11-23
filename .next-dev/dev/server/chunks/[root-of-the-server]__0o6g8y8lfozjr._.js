@@ -196,6 +196,16 @@ function normalizeConnectionForPool(rawUrl) {
         }
     };
 }
+function isExpectedPoolDisconnectError(err) {
+    if (!err || typeof err !== 'object') return false;
+    const record = err;
+    const code = record.code || '';
+    const message = record.message || '';
+    if (code === '57P01' || code === '57P02' || code === '57P03' || code === '08006' || code === '08003' || code === 'ECONNRESET' || code === 'EPIPE' || code === 'ETIMEDOUT') {
+        return true;
+    }
+    return /Connection terminated|terminating connection|socket hang up|read ECONNRESET|Client has encountered a connection error/i.test(message);
+}
 const createPool = ()=>{
     if (!/*TURBOPACK member replacement*/ __turbopack_context__.g._postgresPool) {
         const databaseUrl = resolvePostgresUrl();
@@ -205,8 +215,11 @@ const createPool = ()=>{
                 connectionString,
                 ssl,
                 max: 5,
-                idleTimeoutMillis: 20000,
-                connectionTimeoutMillis: 15000
+                idleTimeoutMillis: 10000,
+                connectionTimeoutMillis: 15000,
+                allowExitOnIdle: true,
+                keepAlive: true,
+                keepAliveInitialDelayMillis: 10000
             });
         } else {
             /*TURBOPACK member replacement*/ __turbopack_context__.g._postgresPool = new __TURBOPACK__imported__module__$5b$externals$5d2f$pg__$5b$external$5d$__$28$pg$2c$__esm_import$2c$__$5b$project$5d2f$node_modules$2f$pg$29$__["Pool"]({
@@ -215,11 +228,19 @@ const createPool = ()=>{
                 password: process.env.SQL_PASSWORD,
                 database: process.env.SQL_DB_NAME,
                 max: 10,
-                connectionTimeoutMillis: 15000
+                idleTimeoutMillis: 10000,
+                connectionTimeoutMillis: 15000,
+                allowExitOnIdle: true,
+                keepAlive: true,
+                keepAliveInitialDelayMillis: 10000
             });
         }
         /*TURBOPACK member replacement*/ __turbopack_context__.g._postgresPool.on('error', (err)=>{
-            console.error('Unexpected error on idle SQL pool client:', err);
+            if (isExpectedPoolDisconnectError(err)) {
+                // pg.Pool automatically evicts closed idle clients and reconnects on the next query.
+                return;
+            }
+            console.warn('SQL pool client warning:', err instanceof Error ? err.message : String(err));
         });
     }
     return /*TURBOPACK member replacement*/ __turbopack_context__.g._postgresPool;

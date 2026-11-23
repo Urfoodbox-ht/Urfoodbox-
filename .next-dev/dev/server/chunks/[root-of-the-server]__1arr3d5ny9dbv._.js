@@ -217,6 +217,16 @@ function normalizeConnectionForPool(rawUrl) {
         }
     };
 }
+function isExpectedPoolDisconnectError(err) {
+    if (!err || typeof err !== 'object') return false;
+    const record = err;
+    const code = record.code || '';
+    const message = record.message || '';
+    if (code === '57P01' || code === '57P02' || code === '57P03' || code === '08006' || code === '08003' || code === 'ECONNRESET' || code === 'EPIPE' || code === 'ETIMEDOUT') {
+        return true;
+    }
+    return /Connection terminated|terminating connection|socket hang up|read ECONNRESET|Client has encountered a connection error/i.test(message);
+}
 const createPool = ()=>{
     if (!/*TURBOPACK member replacement*/ __turbopack_context__.g._postgresPool) {
         const databaseUrl = resolvePostgresUrl();
@@ -226,8 +236,11 @@ const createPool = ()=>{
                 connectionString,
                 ssl,
                 max: 5,
-                idleTimeoutMillis: 20000,
-                connectionTimeoutMillis: 15000
+                idleTimeoutMillis: 10000,
+                connectionTimeoutMillis: 15000,
+                allowExitOnIdle: true,
+                keepAlive: true,
+                keepAliveInitialDelayMillis: 10000
             });
         } else {
             /*TURBOPACK member replacement*/ __turbopack_context__.g._postgresPool = new __TURBOPACK__imported__module__$5b$externals$5d2f$pg__$5b$external$5d$__$28$pg$2c$__esm_import$2c$__$5b$project$5d2f$node_modules$2f$pg$29$__["Pool"]({
@@ -236,11 +249,19 @@ const createPool = ()=>{
                 password: process.env.SQL_PASSWORD,
                 database: process.env.SQL_DB_NAME,
                 max: 10,
-                connectionTimeoutMillis: 15000
+                idleTimeoutMillis: 10000,
+                connectionTimeoutMillis: 15000,
+                allowExitOnIdle: true,
+                keepAlive: true,
+                keepAliveInitialDelayMillis: 10000
             });
         }
         /*TURBOPACK member replacement*/ __turbopack_context__.g._postgresPool.on('error', (err)=>{
-            console.error('Unexpected error on idle SQL pool client:', err);
+            if (isExpectedPoolDisconnectError(err)) {
+                // pg.Pool automatically evicts closed idle clients and reconnects on the next query.
+                return;
+            }
+            console.warn('SQL pool client warning:', err instanceof Error ? err.message : String(err));
         });
     }
     return /*TURBOPACK member replacement*/ __turbopack_context__.g._postgresPool;
@@ -572,11 +593,23 @@ async function ensureSeeded() {
     return seedPromise;
 }
 async function hasClaimedFirebaseOwner() {
-    await ensureSeeded();
-    const existing = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select({
-        id: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].id
-    }).from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["and"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["isNotNull"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].firebaseUid), (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].isActive, true))).limit(1);
-    return existing.length > 0;
+    for(let attempt = 0; attempt < 2; attempt++){
+        try {
+            await ensureSeeded();
+            const existing = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$index$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].select({
+                id: __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].id
+            }).from(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"]).where((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["and"])((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["isNotNull"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].firebaseUid), (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$drizzle$2d$orm$2f$sql$2f$expressions$2f$conditions$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["eq"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$db$2f$schema$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["administratorAccounts"].isActive, true))).limit(1);
+            return existing.length > 0;
+        } catch (error) {
+            if (attempt === 0) {
+                seedPromise = null;
+                await new Promise((resolve)=>setTimeout(resolve, 150));
+                continue;
+            }
+            throw error;
+        }
+    }
+    return false;
 }
 async function getStorefrontData() {
     for(let attempt = 0; attempt < 2; attempt++){

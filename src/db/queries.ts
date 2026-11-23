@@ -320,18 +320,30 @@ export async function ensureSeeded(): Promise<void> {
 }
 
 export async function hasClaimedFirebaseOwner(): Promise<boolean> {
-  await ensureSeeded();
-  const existing = await db
-    .select({ id: administratorAccounts.id })
-    .from(administratorAccounts)
-    .where(
-      and(
-        isNotNull(administratorAccounts.firebaseUid),
-        eq(administratorAccounts.isActive, true)
-      )
-    )
-    .limit(1);
-  return existing.length > 0;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await ensureSeeded();
+      const existing = await db
+        .select({ id: administratorAccounts.id })
+        .from(administratorAccounts)
+        .where(
+          and(
+            isNotNull(administratorAccounts.firebaseUid),
+            eq(administratorAccounts.isActive, true)
+          )
+        )
+        .limit(1);
+      return existing.length > 0;
+    } catch (error) {
+      if (attempt === 0) {
+        seedPromise = null;
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        continue;
+      }
+      throw error;
+    }
+  }
+  return false;
 }
 
 export async function getStorefrontData() {

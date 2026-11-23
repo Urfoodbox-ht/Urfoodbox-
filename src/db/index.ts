@@ -89,6 +89,30 @@ function normalizeConnectionForPool(rawUrl: string): {
   };
 }
 
+function isExpectedPoolDisconnectError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const record = err as { code?: string; message?: string };
+  const code = record.code || '';
+  const message = record.message || '';
+
+  if (
+    code === '57P01' ||
+    code === '57P02' ||
+    code === '57P03' ||
+    code === '08006' ||
+    code === '08003' ||
+    code === 'ECONNRESET' ||
+    code === 'EPIPE' ||
+    code === 'ETIMEDOUT'
+  ) {
+    return true;
+  }
+
+  return /Connection terminated|terminating connection|socket hang up|read ECONNRESET|Client has encountered a connection error/i.test(
+    message
+  );
+}
+
 export const createPool = () => {
   if (!global._postgresPool) {
     const databaseUrl = resolvePostgresUrl();
@@ -99,8 +123,11 @@ export const createPool = () => {
         connectionString,
         ssl,
         max: 5,
-        idleTimeoutMillis: 20000,
+        idleTimeoutMillis: 10000,
         connectionTimeoutMillis: 15000,
+        allowExitOnIdle: true,
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 10000,
       });
     } else {
       global._postgresPool = new Pool({
@@ -109,12 +136,23 @@ export const createPool = () => {
         password: process.env.SQL_PASSWORD,
         database: process.env.SQL_DB_NAME,
         max: 10,
+        idleTimeoutMillis: 10000,
         connectionTimeoutMillis: 15000,
+        allowExitOnIdle: true,
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 10000,
       });
     }
 
     global._postgresPool.on('error', (err) => {
-      console.error('Unexpected error on idle SQL pool client:', err);
+      if (isExpectedPoolDisconnectError(err)) {
+        // pg.Pool automatically evicts closed idle clients and reconnects on the next query.
+        return;
+      }
+      console.warn(
+        'SQL pool client warning:',
+        err instanceof Error ? err.message : String(err)
+      );
     });
   }
   return global._postgresPool;
